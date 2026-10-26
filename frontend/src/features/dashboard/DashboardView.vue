@@ -10,8 +10,9 @@ import EmptyState from '@/design-system/components/EmptyState.vue'
 const data = useDataStore()
 const ui = useUiStore()
 
-const projects = computed(() => data.projects.filter((p) => !p.archived && (!ui.currentProjectId || p.id === ui.currentProjectId)))
-const tasks = computed(() => data.tasksFor(ui.currentProjectId))
+// Le dashboard présente toujours l'ensemble des projets en cours, quel que soit le projet sélectionné ailleurs.
+const projects = computed(() => data.projects.filter((p) => !p.archived && p.status !== 'Terminé'))
+const tasks = computed(() => data.tasks.filter((t) => projects.value.some((p) => p.id === t.projectId)))
 const stats = useTaskStats(tasks)
 const deliverables = computed(() => data.deliverables.filter((d) => projects.value.some((p) => p.id === d.projectId)))
 const deliverablesDone = computed(() => deliverables.value.filter((d) => d.validatedAt || d.deliveredAt).length)
@@ -39,10 +40,9 @@ const statusRow = computed(() => [
   <div>
     <header class="page-header">
       <div>
-        <h1>{{ ui.currentProjectId ? data.projectById[ui.currentProjectId]?.name : 'Tous les projets' }}</h1>
+        <h1>Projets en cours</h1>
         <p>{{ plural(stats.total, 'tâche') }} suivies, {{ stats.blocked }} bloquée(s), {{ stats.waiting }} en attente d'un tiers.</p>
       </div>
-      <button v-if="ui.currentProjectId" type="button" class="show-all" @click="ui.selectProject('')">Voir tous les projets</button>
     </header>
 
     <p v-if="data.loading" class="muted">Chargement…</p>
@@ -102,7 +102,6 @@ const statusRow = computed(() => [
 
 <style scoped lang="scss">
 .muted { color: var(--ink-muted); font-size: var(--text-sm); }
-.show-all { border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-4); cursor: pointer; font-size: var(--text-sm); }
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-4); }
 .kpi {
   &__label { margin: 0; font-size: var(--text-sm); color: var(--ink-muted); }
