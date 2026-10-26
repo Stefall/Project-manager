@@ -20,6 +20,10 @@ export const useDataStore = defineStore('data', {
     loading: false,
     error: null,
     pendingWrites: 0,
+    // Historique et bilans figés : chargés à la demande (écran Bilans), pas au démarrage.
+    events: [],
+    reports: [],
+    historyRevision: null,
   }),
 
   getters: {
@@ -112,6 +116,26 @@ export const useDataStore = defineStore('data', {
     },
     updateDeliverable(deliverable, changes) {
       return this.save('deliverables', deliverable, changes, async (v) => (await backend.updateDeliverable(deliverable.id, changes, v)).deliverable)
+    },
+    /** Charge l'historique et les bilans figés, sauf s'ils sont à jour de la dernière révision connue. */
+    async loadHistory({ force = false } = {}) {
+      if (!force && this.historyRevision !== null && this.historyRevision === this.revision) return
+      const [{ events }, { reports }] = await Promise.all([backend.listEvents(), backend.listReports()])
+      this.events = events
+      this.reports = reports
+      this.historyRevision = this.revision
+    },
+    async freezeReport(input) {
+      this.pendingWrites++
+      try {
+        const { report } = await backend.createReport(input)
+        this.reports.push(report)
+        await this.load({ force: true })
+        await this.loadHistory({ force: true })
+        return report
+      } finally {
+        this.pendingWrites--
+      }
     },
     setMilestone(deliverable, action, field, body) {
       const changes = { [field]: body.undo ? '' : body.date }

@@ -26,4 +26,7 @@ export const phpBackend = {
   createDeliverable: (input) => api.post('/deliverables', input),
   updateDeliverable: (id, changes, version) => api.patch(`/deliverables/${id}`, changes, version),
   deliverableMilestone: (id, action, body, version) => api.post(`/deliverables/${id}/${action}`, body, version),
+  listEvents: () => api.get('/events'),
+  listReports: () => api.get('/reports'),
+  createReport: (input) => api.post('/reports', input),
 }
