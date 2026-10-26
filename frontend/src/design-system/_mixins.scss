@@ -1,0 +1,20 @@
+$bp-tablet: 768px;
+$bp-desktop: 1100px;
+
+@mixin below($bp) {
+  @media (max-width: $bp - 1) { @content; }
+}
+
+@mixin focus-ring {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -1,0 +1,19 @@
+# Racine web : seul ce dossier est exposé. config/, storage/ et api/ restent hors d'atteinte.
+Options -Indexes
+RewriteEngine On
+
+# HTTPS obligatoire
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=31536000"
+</IfModule>
+
+# API
+RewriteRule ^api(/.*)?$ index.php [L,QSA]
+
+# Front compilé : fichiers existants servis tels quels, sinon index de l'app (historique Vue Router)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+RewriteRule ^ app/index.html [L]

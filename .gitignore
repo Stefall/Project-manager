@@ -1,0 +1,11 @@
+/config/.env
+/config/*.json
+/storage/**
+!/storage/**/.gitkeep
+/api/vendor/
+/frontend/node_modules/
+/public/app/
+.phpunit.result.cache
+.DS_Store
+/frontend/dist/
+/frontend/.env.local
