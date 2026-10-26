@@ -42,6 +42,7 @@ const statusRow = computed(() => [
         <h1>{{ ui.currentProjectId ? data.projectById[ui.currentProjectId]?.name : 'Tous les projets' }}</h1>
         <p>{{ plural(stats.total, 'tâche') }} suivies, {{ stats.blocked }} bloquée(s), {{ stats.waiting }} en attente d'un tiers.</p>
       </div>
+      <button v-if="ui.currentProjectId" type="button" class="show-all" @click="ui.selectProject('')">Voir tous les projets</button>
     </header>
 
     <p v-if="data.loading" class="muted">Chargement…</p>
@@ -101,6 +102,7 @@ const statusRow = computed(() => [
 
 <style scoped lang="scss">
 .muted { color: var(--ink-muted); font-size: var(--text-sm); }
+.show-all { border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-4); cursor: pointer; font-size: var(--text-sm); }
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-4); }
 .kpi {
   &__label { margin: 0; font-size: var(--text-sm); color: var(--ink-muted); }
