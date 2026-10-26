@@ -1,25 +1,25 @@
 import { defineStore } from 'pinia'
-import { api, setCsrfToken } from '@/api/client'
+import { backend } from '@/api/backend'
 
 export const useSessionStore = defineStore('session', {
   state: () => ({ user: null, ready: false }),
   getters: {
     isAdmin: (s) => s.user?.role === 'admin',
+    usesGoogle: () => backend.kind === 'sheets',
   },
   actions: {
     async load() {
-      const { user, csrf } = await api.get('/auth/me')
-      setCsrfToken(csrf)
-      this.user = user
-      this.ready = true
+      try {
+        this.user = (await backend.me()).user
+      } finally {
+        this.ready = true
+      }
     },
-    async login(email, password) {
-      const { user, csrf } = await api.post('/auth/login', { email, password })
-      setCsrfToken(csrf)
-      this.user = user
+    async login(credentials) {
+      this.user = (await backend.login(credentials)).user
     },
     async logout() {
-      await api.post('/auth/logout')
+      await backend.logout()
       this.user = null
     },
   },

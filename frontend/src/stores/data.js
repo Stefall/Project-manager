@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { api } from '@/api/client'
+import { backend } from '@/api/backend'
 
 const POLL_MS = 30_000
 
@@ -31,8 +31,7 @@ export const useDataStore = defineStore('data', {
     async load({ force = false } = {}) {
       this.loading = this.revision === null
       try {
-        const query = !force && this.revision !== null ? `?since=${this.revision}` : ''
-        const data = await api.get(`/bootstrap${query}`)
+        const data = await backend.bootstrap(!force ? this.revision : null)
         if (!data.unchanged) Object.assign(this, data)
         this.revision = data.revision
         this.error = null
@@ -54,7 +53,7 @@ export const useDataStore = defineStore('data', {
       this.tasks.unshift({ ...input, id: tempId, version: 0, pending: true })
       this.pendingWrites++
       try {
-        const { task } = await api.post('/tasks', input)
+        const { task } = await backend.createTask(input)
         this.tasks.splice(this.tasks.findIndex((t) => t.id === tempId), 1, task)
         return task
       } catch (e) {
@@ -72,7 +71,7 @@ export const useDataStore = defineStore('data', {
       this.tasks.splice(index, 1, { ...previous, ...changes })
       this.pendingWrites++
       try {
-        const { task: saved } = await api.patch(`/tasks/${task.id}`, changes, previous.version)
+        const { task: saved } = await backend.updateTask(task.id, changes, previous.version)
         this.tasks.splice(index, 1, saved)
         return saved
       } catch (e) {

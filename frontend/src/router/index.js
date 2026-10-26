@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 
 const routes = [
@@ -18,11 +18,13 @@ const routes = [
   },
 ]
 
-const router = createRouter({ history: createWebHistory('/'), routes })
+// GitHub Pages ne sait pas réécrire les URL : la démo utilise des URL en #/taches.
+const history = import.meta.env.VITE_BACKEND === 'sheets' ? createWebHashHistory() : createWebHistory('/')
+const router = createRouter({ history, routes })
 
 router.beforeEach(async (to) => {
   const session = useSessionStore()
-  if (!session.ready) await session.load().catch(() => {})
+  if (!session.ready) await session.load().catch(() => { session.user = null })
   if (!to.meta.public && !session.user) return { name: 'login', query: { next: to.fullPath } }
   if (to.meta.admin && !session.isAdmin) return { name: 'dashboard' }
 })

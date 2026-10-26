@@ -16,6 +16,10 @@ Application interne de pilotage de projets de l'agence VLT. Front Vue 3 compilé
 | 8 | Historique et bilans PDF | journal des événements fait ; bilans à faire |
 | 9 | Tests, sécurisation, déploiement | tests du dépôt de données faits |
 
+## Démo sans serveur
+
+Pour la démo, le front est publié sur GitHub Pages et parle directement au Google Sheet avec la connexion Google de chaque membre (`VITE_BACKEND=sheets`). Mise en place : [docs/demo-github-pages.md](docs/demo-github-pages.md). La version serveur (API PHP) reste la cible si l'outil est validé.
+
 ## Arborescence
 
 ```

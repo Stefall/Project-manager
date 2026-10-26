@@ -54,7 +54,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       </ul>
       <div class="shell__user">
         <span>{{ session.user?.name || session.user?.email }}</span>
-        <button type="button" @click="session.logout().then(() => $router.push('/login'))">Déconnexion</button>
+        <button type="button" @click="session.logout().then(() => $router.push({ name: 'login' }))">Déconnexion</button>
       </div>
     </nav>
 
