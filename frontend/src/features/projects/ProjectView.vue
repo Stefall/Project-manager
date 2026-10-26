@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useUiStore } from '@/stores/ui'
@@ -20,8 +20,6 @@ const tasks = computed(() => data.tasksFor(route.params.id))
 const loose = computed(() => tasks.value.filter((t) => !t.deliverableId))
 const stats = useTaskStats(tasks)
 
-// Le sélecteur de projet de la barre du haut suit la fiche ouverte.
-watch(() => route.params.id, (id) => id && ui.selectProject(id), { immediate: true })
 </script>
 
 <template>

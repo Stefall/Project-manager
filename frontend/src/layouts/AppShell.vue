@@ -23,12 +23,15 @@ const nav = computed(() => [
   ...(session.isAdmin ? [{ to: '/admin', label: 'Administration' }] : []),
 ])
 
+// Sur une fiche projet, une nouvelle tâche est rattachée à ce projet.
+const contextProjectId = computed(() => (route.name === 'project' ? route.params.id : ui.currentProjectId))
+
 // Raccourci « N » : nouvelle tâche, sauf pendant une saisie
 function onKey(e) {
   const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable
   if (e.key.toLowerCase() === 'n' && !typing && !e.metaKey && !e.ctrlKey && !ui.quickAdd.open && !ui.editor) {
     e.preventDefault()
-    ui.openQuickAdd({ projectId: ui.currentProjectId })
+    ui.openQuickAdd({ projectId: contextProjectId.value })
   }
 }
 
@@ -70,7 +73,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </select>
         </label>
         <SaveIndicator />
-        <VButton variant="primary" class="shell__new" aria-keyshortcuts="n" @click="ui.openQuickAdd({ projectId: ui.currentProjectId })">
+        <VButton variant="primary" class="shell__new" aria-keyshortcuts="n" @click="ui.openQuickAdd({ projectId: contextProjectId })">
           + Nouvelle tâche
         </VButton>
       </header>
