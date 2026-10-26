@@ -1,12 +1,17 @@
 # Démo VLT Project Manager sur GitHub Pages, connectée directement au Google Sheet.
-# Prérequis (une fois) : Settings → Pages → Source « GitHub Actions »,
-# et Settings → Secrets and variables → Actions → Variables : GOOGLE_CLIENT_ID, SPREADSHEET_ID.
+# Prérequis (une fois) : Settings → Pages → Source « GitHub Actions ».
+# L'ID client OAuth et l'identifiant du Sheet ne sont pas secrets (l'accès dépend du partage du Sheet) :
+# valeurs de la démo ci-dessous, remplaçables par les variables GOOGLE_CLIENT_ID et SPREADSHEET_ID du dépôt.
 name: Démo GitHub Pages
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+env:
+  GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID || '709702933771-rm8js5m5mtdi1sd91mksiq0jol5ubftu.apps.googleusercontent.com' }}
+  SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID || '1okHS34IpNTE-mOEuQo82X1zZPiExos2xG4TpZ0D8etY' }}
 
 permissions:
   contents: read
@@ -27,16 +32,12 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Vérifier la configuration
-        run: |
-          test -n "${{ vars.GOOGLE_CLIENT_ID }}" || { echo "::error::Variable GOOGLE_CLIENT_ID manquante"; exit 1; }
-          test -n "${{ vars.SPREADSHEET_ID }}" || { echo "::error::Variable SPREADSHEET_ID manquante"; exit 1; }
       - name: Build
         working-directory: frontend
         env:
           VITE_BACKEND: sheets
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
-          VITE_SPREADSHEET_ID: ${{ vars.SPREADSHEET_ID }}
+          VITE_GOOGLE_CLIENT_ID: ${{ env.GOOGLE_CLIENT_ID }}
+          VITE_SPREADSHEET_ID: ${{ env.SPREADSHEET_ID }}
           VITE_BASE: /${{ github.event.repository.name }}/
           VITE_OUT_DIR: dist
         run: |

@@ -26,9 +26,9 @@ Limites par rapport à la version serveur : pas de verrou serveur (deux enregist
 
 En mode Test, Google affiche un avertissement « application non validée » à la première connexion : cliquer sur « Continuer ». C'est normal pour une démo interne.
 
-### 2. Variables du dépôt GitHub
+### 2. Variables du dépôt GitHub (facultatif)
 
-Dépôt → **Settings → Secrets and variables → Actions → onglet Variables** :
+Les valeurs de la démo sont déjà dans `.github/workflows/pages.yml`. Pour en changer sans modifier le fichier : dépôt → **Settings → Secrets and variables → Actions → onglet Variables** :
 
 | Variable | Valeur |
 | --- | --- |
