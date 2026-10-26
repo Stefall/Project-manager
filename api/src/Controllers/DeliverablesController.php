@@ -46,28 +46,64 @@ final class DeliverablesController
         return ['deliverable' => $deliverable];
     }
 
-    /** POST /deliverables/{id}/validate | deliver | publish, avec une date (par défaut aujourd'hui), une note et un lien. */
+    public function update(Request $request): array
+    {
+        $id = $request->params['id'];
+        $changes = array_intersect_key($request->body, array_flip(['name', 'description', 'dueDate', 'links', 'archived']));
+        (new Validator(array_merge($this->repo->get('DELIVERABLES', $id), $changes)))
+            ->string('name', true, 200)
+            ->string('description')
+            ->date('dueDate')
+            ->listOf('links', fn ($l) => is_array($l) && Validator::isUrl($l['url'] ?? null), 'Lien invalide (http ou https attendu).')
+            ->validate();
+        if (isset($changes['archived'])) {
+            $changes['archived'] = (bool) $changes['archived'];
+        }
+
+        $deliverable = $this->repo->update('DELIVERABLES', $id, $changes, $request->expectedVersion(), $request->user['email'],
+            function (array $before, array $after) use ($id): ?array {
+                $changed = ProjectsController::diff($before, $after, ['name', 'description', 'dueDate', 'links', 'archived']);
+                if ($changed === []) {
+                    return null;
+                }
+                return [
+                    'type' => isset($changed['archived']) ? 'deliverable.archived' : 'deliverable.updated',
+                    'entityType' => 'deliverable',
+                    'projectId' => $after['projectId'],
+                    'deliverableId' => $id,
+                    'changes' => $changed,
+                    'description' => 'Livrable modifié : ' . $after['name'],
+                ];
+            });
+        return ['deliverable' => $deliverable];
+    }
+
+    /**
+     * POST /deliverables/{id}/validate | deliver | publish, avec une date (par défaut aujourd'hui), une note et un lien.
+     * Avec "undo": true, annule un jalon saisi par erreur (événement *.cancelled).
+     */
     public function milestone(Request $request): array
     {
         $milestone = self::MILESTONES[$request->params['action']] ?? throw new HttpException(404, 'Action inconnue.');
-        $body = $request->body + ['date' => date('Y-m-d'), 'note' => '', 'link' => ''];
+        $body = $request->body + ['date' => date('Y-m-d'), 'note' => '', 'link' => '', 'undo' => false];
+        $undo = (bool) $body['undo'];
         (new Validator($body))
             ->date('date')
             ->string('note', false, 2000)
             ->check($body['link'] === '' || Validator::isUrl($body['link']), 'link', 'Lien invalide.')
             ->validate();
 
-        $deliverable = $this->repo->update('DELIVERABLES', $request->params['id'], [$milestone['field'] => $body['date']],
+        $deliverable = $this->repo->update('DELIVERABLES', $request->params['id'], [$milestone['field'] => $undo ? '' : $body['date']],
             $request->expectedVersion(), $request->user['email'],
             fn (array $before, array $after) => [
-                'type' => $milestone['type'],
+                'type' => $milestone['type'] . ($undo ? '.cancelled' : ''),
                 'entityType' => 'deliverable',
                 'projectId' => $after['projectId'],
                 'deliverableId' => $after['id'],
-                'effectiveDate' => $body['date'],
+                'effectiveDate' => $undo ? ($before[$milestone['field']] ?? '') : $body['date'],
                 'note' => $body['note'],
                 'link' => $body['link'],
-                'description' => $milestone['label'] . ' : ' . $after['name'],
+                'description' => ($undo ? 'Annulé : ' : '') . $milestone['label'] . ' : ' . $after['name'],
             ]);
         return ['deliverable' => $deliverable];
     }

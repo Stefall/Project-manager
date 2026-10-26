@@ -83,12 +83,12 @@ const statusRow = computed(() => [
             <h3 class="list-title">En retard</h3>
             <p v-if="!stats.late.length" class="muted">Aucune tâche en retard.</p>
             <ul class="deadlines">
-              <li v-for="t in stats.late" :key="t.id"><span class="late">{{ formatDate(t.deadline) }}</span> {{ t.title }}</li>
+              <li v-for="t in stats.late" :key="t.id"><span class="late">{{ formatDate(t.deadline) }}</span> <button type="button" class="task-link" @click="ui.openEditor('task', t.id)">{{ t.title }}</button></li>
             </ul>
             <h3 class="list-title">7 prochains jours</h3>
             <p v-if="!stats.soon.length" class="muted">Rien d'imminent.</p>
             <ul class="deadlines">
-              <li v-for="t in stats.soon" :key="t.id"><span>{{ formatDate(t.deadline) }}</span> {{ t.title }}</li>
+              <li v-for="t in stats.soon" :key="t.id"><span>{{ formatDate(t.deadline) }}</span> <button type="button" class="task-link" @click="ui.openEditor('task', t.id)">{{ t.title }}</button></li>
             </ul>
             <h3 class="list-title">Dates à préciser</h3>
             <p class="muted">{{ plural(stats.undated.length, 'tâche') }} ouverte(s) sans deadline.</p>
@@ -124,6 +124,7 @@ const statusRow = computed(() => [
 }
 .progress { height: 6px; background: var(--surface-sunken); border-radius: var(--radius-pill); overflow: hidden; span { display: block; height: 100%; background: var(--ink); } }
 .list-title { font-size: var(--text-sm); margin: var(--space-4) 0 var(--space-2); &:first-child { margin-top: 0; } }
+.task-link { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; &:hover { text-decoration: underline; } }
 .deadlines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); font-size: var(--text-sm); span { display: inline-block; min-width: 56px; color: var(--ink-muted); } .late { color: var(--status-blocked); font-weight: var(--weight-strong); } }
 
 @include below($bp-desktop) { .kpis { grid-template-columns: repeat(2, 1fr); } .columns { grid-template-columns: 1fr; } }

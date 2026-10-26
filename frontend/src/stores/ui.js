@@ -9,6 +9,8 @@ function savedProject() {
 export const useUiStore = defineStore('ui', {
   state: () => ({
     quickAdd: { open: false, defaults: {} },
+    // Panneau latéral d'édition : { kind: 'task' | 'project' | 'deliverable', id, defaults }
+    editor: null,
     currentProjectId: savedProject(),
     toasts: [],
   }),
@@ -18,6 +20,12 @@ export const useUiStore = defineStore('ui', {
     },
     closeQuickAdd() {
       this.quickAdd.open = false
+    },
+    openEditor(kind, id = null, defaults = {}) {
+      this.editor = { kind, id, defaults }
+    },
+    closeEditor() {
+      this.editor = null
     },
     selectProject(id) {
       this.currentProjectId = id

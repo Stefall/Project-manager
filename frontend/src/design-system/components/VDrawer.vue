@@ -66,7 +66,7 @@ watch(() => props.open, async (open) => {
   }
 
   &__close { border: 0; background: none; font-size: 22px; cursor: pointer; padding: var(--space-1) var(--space-2); }
-  &__body { flex: 1; overflow: auto; padding: var(--space-6); }
+  &__body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: var(--space-6); > * { min-width: 0; } }
   &__footer { display: flex; gap: var(--space-2); justify-content: flex-end; flex-wrap: wrap; padding: var(--space-4) var(--space-6); border-top: 1px solid var(--line); }
 }
 
