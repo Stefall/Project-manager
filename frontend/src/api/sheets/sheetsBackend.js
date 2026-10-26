@@ -3,6 +3,7 @@ import { normalizeAll, withDefaults } from '@/domain/legacy'
 import { DONE, settingsFrom } from '@/domain/settings'
 import { nextId, pick, TASK_FIELDS, taskEvent, validateTask } from '@/domain/tasks'
 import { DELIVERABLE_FIELDS, diff, MILESTONES, PROJECT_FIELDS, validateDeliverable, validateMilestone, validateProject } from '@/domain/projects'
+import { nextNumber } from '@/domain/reports'
 import { googleAuth } from './googleAuth'
 import { sheets } from './sheetsClient'
 
@@ -236,5 +237,40 @@ export const sheetsBackend = {
       description: `${undo ? 'Annulé : ' : ''}${milestone.description} : ${after.name}`,
     }))
     return { deliverable: remember('deliverables', deliverable) }
+  },
+
+  async listEvents() {
+    return { events: rowsOf(await sheets.readTab('EVENTS')) }
+  },
+
+  async listReports() {
+    return { reports: rowsOf(await sheets.readTab('REPORTS')) }
+  },
+
+  /** Fige un bilan : la ligne n'est plus jamais modifiée, une nouvelle génération crée une nouvelle version. */
+  async createReport({ month, projectId = '', comment = '', content }) {
+    if (!/^\d{4}-\d{2}$/.test(month || '')) throw invalid({ month: 'Mois invalide.' })
+    if (projectId && !cache?.projects.some((p) => p.id === projectId)) throw invalid({ projectId: 'Projet inconnu.' })
+    const rows = rowsOf(await sheets.readTab('REPORTS'))
+    const stamp = now()
+    const report = {
+      id: nextId('R', rows.map((r) => r.id), 4),
+      month,
+      projectId,
+      number: nextNumber(rows, { month, projectId }),
+      comment: String(comment).slice(0, 2000),
+      content,
+      version: 1,
+      archived: false,
+      createdAt: stamp,
+      createdBy: me.email,
+    }
+    // Une cellule Google Sheets contient au plus 50 000 caractères.
+    if (JSON.stringify(report).length > 48_000) throw new ApiError(413, { error: 'Bilan trop volumineux pour être figé : limitez-le à un projet.' })
+    await sheets.appendRow('REPORTS', report.id, report)
+    const scope = projectId ? cache.projects.find((p) => p.id === projectId)?.name : 'tous les projets'
+    await appendEvent({ type: 'report.frozen', entityType: 'report', entity: report.id, projectId, description: `Bilan ${month} figé (version ${report.number}, ${scope})` })
+    await bumpRevision()
+    return { report }
   },
 }

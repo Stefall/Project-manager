@@ -6,6 +6,7 @@ use Vlt\Controllers\AuthController;
 use Vlt\Controllers\BootstrapController;
 use Vlt\Controllers\DeliverablesController;
 use Vlt\Controllers\ProjectsController;
+use Vlt\Controllers\ReportsController;
 use Vlt\Controllers\TasksController;
 use Vlt\Http\HttpException;
 use Vlt\Http\Request;
@@ -37,6 +38,7 @@ try {
     $tasks = new TasksController($repo);
     $deliverables = new DeliverablesController($repo);
     $projects = new ProjectsController($repo);
+    $reports = new ReportsController($repo);
 
     $member = [Middleware::auth(), Middleware::csrf()];
     $router = new Router();
@@ -55,6 +57,10 @@ try {
     $router->add('POST', '/deliverables', $deliverables->create(...), $member);
     $router->add('PATCH', '/deliverables/{id}', $deliverables->update(...), $member);
     $router->add('POST', '/deliverables/{id}/{action}', $deliverables->milestone(...), $member);
+
+    $router->add('GET', '/events', $reports->events(...), $member);
+    $router->add('GET', '/reports', $reports->index(...), $member);
+    $router->add('POST', '/reports', $reports->create(...), $member);
 
     Response::json($router->dispatch(Request::fromGlobals()));
 } catch (ConflictException $e) {

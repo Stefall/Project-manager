@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test src/domain/planning.test.js"
+    "test": "node --test src/domain/planning.test.js src/domain/reports.test.js"
   },
   "dependencies": {
     "pinia": "^2.2.6",
