@@ -30,5 +30,6 @@ jobs:
       - working-directory: frontend
         run: |
           npm ci
+          npm test
           npm run build
           VITE_BACKEND=sheets VITE_BASE=/demo/ VITE_OUT_DIR=dist npm run build
