@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import VButton from '@/design-system/components/VButton.vue'
@@ -12,6 +12,11 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
+if (route.query.raison === 'session') error.value = 'Votre session Google a expiré ou n\'est plus valide. Reconnectez-vous.'
+onMounted(() => {
+  if (session.usesGoogle) session.prepare().catch((e) => { error.value = e.message })
+})
+
 async function submit() {
   error.value = ''
   loading.value = true
@@ -19,7 +24,8 @@ async function submit() {
     await session.login({ email: email.value, password: password.value })
     router.replace(route.query.next || '/')
   } catch (e) {
-    error.value = e.message
+    console.error('[VLT] Connexion :', e)
+    error.value = e.message || 'La connexion a échoué. Réessayez.'
   } finally {
     loading.value = false
   }

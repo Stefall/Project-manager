@@ -15,6 +15,9 @@ export const useSessionStore = defineStore('session', {
         this.ready = true
       }
     },
+    prepare() {
+      return backend.prepare?.() ?? Promise.resolve()
+    },
     async login(credentials) {
       this.user = (await backend.login(credentials)).user
     },

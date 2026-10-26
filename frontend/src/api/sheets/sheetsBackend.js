@@ -83,6 +83,10 @@ export const sheetsBackend = {
     return { user: me }
   },
 
+  prepare() {
+    return googleAuth.prepare()
+  },
+
   async login() {
     const account = await googleAuth.signIn()
     try {
