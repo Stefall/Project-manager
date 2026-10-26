@@ -29,4 +29,20 @@ router.beforeEach(async (to) => {
   if (to.meta.admin && !session.isAdmin) return { name: 'dashboard' }
 })
 
+// Après une mise en ligne, les fichiers de l'ancienne version n'existent plus : un onglet resté ouvert
+// échoue à charger l'écran demandé et le clic semble ne rien faire. On recharge alors la page sur l'écran visé.
+const CHUNK_ERROR = /dynamically imported module|Importing a module script failed|Loading chunk|Unable to preload/i
+router.onError((error, to) => {
+  if (!CHUNK_ERROR.test(error?.message ?? '')) return
+  let reloaded = false
+  try { reloaded = sessionStorage.getItem('vltpm.reload') === to.fullPath } catch { /* ignoré */ }
+  if (reloaded) return // déjà rechargé une fois pour cet écran : on n'insiste pas
+  try { sessionStorage.setItem('vltpm.reload', to.fullPath) } catch { /* ignoré */ }
+  window.location.assign(router.resolve(to).href)
+  window.location.reload()
+})
+router.afterEach(() => {
+  try { sessionStorage.removeItem('vltpm.reload') } catch { /* ignoré */ }
+})
+
 export default router
