@@ -1,0 +1,64 @@
+// Jetons du design system VLT. Toute couleur, taille ou durée de l'interface vient d'ici.
+:root {
+  // Surfaces et encre : noir sur blanc cassé chaud
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-sunken: #f3f0eb;
+  --ink: #111111;
+  --ink-muted: #6b6862;
+  --ink-faint: #9a968f;
+  --line: #e7e3dc;
+  --line-strong: #d4cfc6;
+  --focus: #111111;
+
+  // Statuts : seules couleurs vives de l'interface
+  --status-todo: #6b7280;
+  --status-progress: #2563eb;
+  --status-waiting: #c2410c;
+  --status-blocked: #dc2626;
+  --status-done: #15803d;
+  --status-todo-bg: #f1f2f4;
+  --status-progress-bg: #eaf0fd;
+  --status-waiting-bg: #fbeee6;
+  --status-blocked-bg: #fcebeb;
+  --status-done-bg: #e8f3ec;
+
+  // Typographie
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-editorial: 'Source Serif 4', Georgia, serif;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --weight-regular: 400;
+  --weight-strong: 600;
+
+  // Espacements : base 4 px
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  // Formes
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+
+  // Gabarit
+  --sidebar-width: 240px;
+  --topbar-height: 56px;
+  --drawer-width: 480px;
+
+  // Mouvement
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration: 0ms; }
+}
