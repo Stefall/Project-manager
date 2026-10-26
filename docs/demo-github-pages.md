@@ -33,7 +33,7 @@ Dépôt → **Settings → Secrets and variables → Actions → onglet Variable
 | Variable | Valeur |
 | --- | --- |
 | `GOOGLE_CLIENT_ID` | l'ID client de l'étape 1 |
-| `SPREADSHEET_ID` | `1okHS34IpNTE-mOEuQo82X1zZPiExos2xG4TpZ0D8etY` (Sheet de démo) |
+| `SPREADSHEET_ID` | identifiant du Sheet de démo (dans son URL, entre `/d/` et `/edit`) |
 
 ### 3. Activer Pages
 
