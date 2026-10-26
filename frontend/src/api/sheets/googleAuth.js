@@ -31,24 +31,58 @@ function restore() {
   } catch { /* ignoré */ }
 }
 
-async function requestToken(prompt) {
-  await loadScript()
-  return new Promise((resolve, reject) => {
-    tokenClient ??= window.google.accounts.oauth2.initTokenClient({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      scope: SCOPES,
-      callback: () => {},
-    })
-    tokenClient.callback = (response) => {
-      if (response.error) return reject(new Error('Connexion Google refusée ou annulée.'))
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
+
+// Messages des erreurs renvoyées par Google Identity Services (error_callback).
+const POPUP_ERRORS = {
+  popup_failed_to_open: 'La fenêtre de connexion Google a été bloquée par le navigateur. Autorisez les fenêtres pop-up pour ce site, puis réessayez.',
+  popup_closed: 'La fenêtre de connexion Google a été fermée avant la fin. Réessayez.',
+}
+
+function client() {
+  tokenClient ??= window.google.accounts.oauth2.initTokenClient({
+    client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    callback: () => {},
+  })
+  return tokenClient
+}
+
+/**
+ * Ouvre la fenêtre Google. Si la bibliothèque est déjà chargée, la fenêtre s'ouvre dans le même tour
+ * que le clic : sinon certains navigateurs (Safari, Firefox) la bloquent sans prévenir.
+ */
+function requestToken(prompt) {
+  const open = () => new Promise((resolve, reject) => {
+    const tc = client()
+    tc.callback = (response) => {
+      if (response.error) {
+        console.error('[VLT] Connexion Google refusée :', response)
+        return reject(new Error(response.error === 'access_denied'
+          ? 'Connexion Google refusée. Si Google indique « Accès bloqué », votre compte doit être ajouté comme utilisateur test de l\'application.'
+          : `Connexion Google refusée (${response.error_description || response.error}).`))
+      }
+      if (!window.google.accounts.oauth2.hasGrantedAllScopes(response, SHEETS_SCOPE)) {
+        return reject(new Error('L\'accès à Google Sheets n\'a pas été autorisé. Reconnectez-vous et cochez la case « Afficher, modifier, créer et supprimer vos feuilles de calcul Google Sheets ».'))
+      }
       resolve(response)
     }
-    tokenClient.error_callback = () => reject(new Error('Connexion Google interrompue.'))
-    tokenClient.requestAccessToken({ prompt, hint: token?.email })
+    tc.error_callback = (error) => {
+      console.error('[VLT] Fenêtre Google :', error)
+      reject(new Error(POPUP_ERRORS[error?.type] ?? `Connexion Google interrompue (${error?.type || error?.message || 'erreur inconnue'}).`))
+    }
+    tc.requestAccessToken({ prompt, hint: token?.email })
   })
+  if (window.google?.accounts?.oauth2) return open()
+  return loadScript().then(open)
 }
 
 export const googleAuth = {
+  /** Charge la bibliothèque Google à l'avance, pour que le clic ouvre la fenêtre sans délai. */
+  prepare() {
+    return loadScript().then(client)
+  },
+
   /** Reprend la session de l'onglet si le jeton est encore valide. */
   current() {
     if (!token) restore()
@@ -59,7 +93,8 @@ export const googleAuth = {
     const response = await requestToken('select_account')
     const profile = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${response.access_token}` },
-    }).then((r) => r.json())
+    }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
+    if (!profile.email) throw new Error('Google n\'a pas transmis l\'adresse e-mail du compte. Reconnectez-vous en acceptant le partage de l\'adresse e-mail.')
     token = {
       access_token: response.access_token,
       expires_at: Date.now() + response.expires_in * 1000,
