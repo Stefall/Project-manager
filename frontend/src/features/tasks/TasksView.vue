@@ -25,6 +25,16 @@ const tasks = computed(() => {
 })
 const columns = computed(() => data.settings.statuses.map((s) => ({ status: s.id, tasks: tasks.value.filter((t) => t.status === s.id) })))
 
+// Glisser-déposer entre colonnes du Kanban ; au clavier, le statut se change dans la fiche de la tâche.
+const dragged = ref(null)
+const dragOver = ref(null)
+function drop(status) {
+  const task = dragged.value
+  dragged.value = null
+  dragOver.value = null
+  if (task && task.status !== status) changeStatus(task, status)
+}
+
 async function changeStatus(task, next) {
   try {
     await data.updateTask(task, { status: next })
@@ -69,7 +79,10 @@ async function changeStatus(task, next) {
       </thead>
       <tbody>
         <tr v-for="t in tasks" :key="t.id" :class="{ pending: t.pending }">
-          <td><span class="id">{{ t.id.startsWith('tmp') ? '…' : t.id }}</span> {{ t.title }}</td>
+          <td>
+            <span class="id">{{ t.id.startsWith('tmp') ? '…' : t.id }}</span>
+            <button type="button" class="task-link" :disabled="t.pending" @click="ui.openEditor('task', t.id)">{{ t.title }}</button>
+          </td>
           <td class="muted">{{ t.deliverable }}</td>
           <td>
             <label class="sr-only" :for="`st-${t.id}`">Statut de {{ t.title }}</label>
@@ -84,11 +97,28 @@ async function changeStatus(task, next) {
     </table>
 
     <div v-else class="kanban">
-      <section v-for="col in columns" :key="col.status" class="kanban__col" :aria-label="col.status">
+      <section
+        v-for="col in columns"
+        :key="col.status"
+        class="kanban__col"
+        :class="{ 'kanban__col--over': dragOver === col.status }"
+        :aria-label="col.status"
+        @dragover.prevent="dragOver = col.status"
+        @dragleave="dragOver === col.status && (dragOver = null)"
+        @drop.prevent="drop(col.status)"
+      >
         <header><StatusBadge :status="col.status" /> <span class="muted">{{ col.tasks.length }}</span></header>
-        <article v-for="t in col.tasks" :key="t.id" class="kanban__card">
-          <p>{{ t.title }}</p>
-          <p class="muted">{{ t.deliverable }}<template v-if="t.deadline"> · {{ formatDate(t.deadline) }}</template></p>
+        <article
+          v-for="t in col.tasks"
+          :key="t.id"
+          class="kanban__card"
+          :class="{ 'kanban__card--dragging': dragged?.id === t.id }"
+          :draggable="!t.pending"
+          @dragstart="dragged = t"
+          @dragend="dragged = null; dragOver = null"
+        >
+          <button type="button" class="task-link" @click="ui.openEditor('task', t.id)">{{ t.title }}</button>
+          <p class="muted">{{ t.deliverable }}<template v-if="t.deadline"> · {{ formatDate(t.deadline) }}</template><template v-else-if="t.deadlineText"> · {{ t.deadlineText }}</template></p>
         </article>
       </section>
     </div>
@@ -114,8 +144,11 @@ async function changeStatus(task, next) {
 .kanban { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: var(--space-4); overflow-x: auto;
   &__col { background: var(--surface-sunken); border-radius: var(--radius-md); padding: var(--space-3); display: grid; gap: var(--space-2); align-content: start;
     header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); } }
-  &__card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: var(--space-3); p { margin: 0; } p + p { margin-top: var(--space-1); } }
+  &__col--over { outline: 2px dashed var(--line-strong); outline-offset: -2px; }
+  &__card--dragging { opacity: 0.4; }
+  &__card { cursor: grab; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: var(--space-3); p { margin: var(--space-1) 0 0; } }
 }
+.task-link { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; &:hover { text-decoration: underline; } }
 .link { border: 0; background: none; text-decoration: underline; cursor: pointer; }
 @include below($bp-tablet) { .tasks-table th:nth-child(2), .tasks-table td:nth-child(2), .tasks-table th:nth-child(4), .tasks-table td:nth-child(4) { display: none; } }
 </style>

@@ -4,6 +4,7 @@ import { useDataStore } from '@/stores/data'
 import { useUiStore } from '@/stores/ui'
 import VDrawer from '@/design-system/components/VDrawer.vue'
 import VButton from '@/design-system/components/VButton.vue'
+import PolePicker from '@/components/PolePicker.vue'
 
 // Mode réunion : le minimum de champs, le titre en premier, et « Enregistrer et créer une autre »
 // qui garde le projet et le livrable pour enchaîner les tâches.
@@ -103,15 +104,7 @@ async function save(another) {
         </div>
       </fieldset>
 
-      <fieldset class="quick-add__group">
-        <legend>Pôles concernés</legend>
-        <div class="quick-add__poles">
-          <label v-for="pole in data.settings.poles" :key="pole.id" class="quick-add__pole">
-            <input v-model="form.poles" type="checkbox" :value="pole.id" />
-            <span>{{ pole.label }}</span>
-          </label>
-        </div>
-      </fieldset>
+      <PolePicker v-model="form.poles" />
 
       <label class="field">
         <span>Notes de réunion</span>
@@ -152,22 +145,6 @@ async function save(another) {
     input:focus-visible + span { @include focus-ring; }
   }
 
-  &__poles { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
-  &__pole {
-    position: relative;
-    input { position: absolute; opacity: 0; }
-    span {
-      display: inline-block;
-      padding: var(--space-1) var(--space-3);
-      border: 1px solid var(--line-strong);
-      border-radius: var(--radius-pill);
-      font-size: var(--text-sm);
-      cursor: pointer;
-    }
-    input:checked + span { background: var(--ink); border-color: var(--ink); color: var(--surface); }
-    input:checked + span::before { content: '✓ '; }
-    input:focus-visible + span { @include focus-ring; }
-  }
 }
 </style>

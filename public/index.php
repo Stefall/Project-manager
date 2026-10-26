@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Vlt\Controllers\AuthController;
 use Vlt\Controllers\BootstrapController;
 use Vlt\Controllers\DeliverablesController;
+use Vlt\Controllers\ProjectsController;
 use Vlt\Controllers\TasksController;
 use Vlt\Http\HttpException;
 use Vlt\Http\Request;
@@ -35,6 +36,7 @@ try {
     $bootstrap = new BootstrapController($repo);
     $tasks = new TasksController($repo);
     $deliverables = new DeliverablesController($repo);
+    $projects = new ProjectsController($repo);
 
     $member = [Middleware::auth(), Middleware::csrf()];
     $router = new Router();
@@ -48,7 +50,10 @@ try {
     $router->add('PATCH', '/tasks/{id}', $tasks->update(...), $member);
     $router->add('POST', '/tasks/{id}/archive', $tasks->archive(...), $member);
 
+    $router->add('PATCH', '/projects/{id}', $projects->update(...), $member);
+
     $router->add('POST', '/deliverables', $deliverables->create(...), $member);
+    $router->add('PATCH', '/deliverables/{id}', $deliverables->update(...), $member);
     $router->add('POST', '/deliverables/{id}/{action}', $deliverables->milestone(...), $member);
 
     Response::json($router->dispatch(Request::fromGlobals()));

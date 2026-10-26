@@ -7,6 +7,7 @@ import { useUiStore } from '@/stores/ui'
 import VButton from '@/design-system/components/VButton.vue'
 import SaveIndicator from '@/design-system/components/SaveIndicator.vue'
 import QuickAddDrawer from '@/features/quick-add/QuickAddDrawer.vue'
+import EditorHost from '@/features/editors/EditorHost.vue'
 
 const data = useDataStore()
 const session = useSessionStore()
@@ -25,7 +26,7 @@ const nav = computed(() => [
 // Raccourci « N » : nouvelle tâche, sauf pendant une saisie
 function onKey(e) {
   const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable
-  if (e.key.toLowerCase() === 'n' && !typing && !e.metaKey && !e.ctrlKey && !ui.quickAdd.open) {
+  if (e.key.toLowerCase() === 'n' && !typing && !e.metaKey && !e.ctrlKey && !ui.quickAdd.open && !ui.editor) {
     e.preventDefault()
     ui.openQuickAdd({ projectId: ui.currentProjectId })
   }
@@ -81,6 +82,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     </div>
 
     <QuickAddDrawer />
+    <EditorHost />
   </div>
 </template>
 
@@ -129,6 +131,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     color: var(--ink-muted);
     button { justify-self: start; border: 0; background: none; padding: 0; text-decoration: underline; cursor: pointer; color: inherit; }
   }
+
+  &__main { min-width: 0; }
 
   &__topbar {
     position: sticky;

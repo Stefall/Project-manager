@@ -45,7 +45,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   &--invalid input, &--invalid select { border-color: var(--status-blocked); }
 }
 
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); }
 @include below($bp-tablet) { .field-row { grid-template-columns: 1fr; } }
 
 .page-header {

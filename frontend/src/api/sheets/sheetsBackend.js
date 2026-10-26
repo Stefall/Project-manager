@@ -2,6 +2,7 @@ import { ApiError } from '@/api/client'
 import { normalizeAll, withDefaults } from '@/domain/legacy'
 import { DONE, settingsFrom } from '@/domain/settings'
 import { nextId, pick, TASK_FIELDS, taskEvent, validateTask } from '@/domain/tasks'
+import { DELIVERABLE_FIELDS, diff, MILESTONES, PROJECT_FIELDS, validateDeliverable, validateMilestone, validateProject } from '@/domain/projects'
 import { googleAuth } from './googleAuth'
 import { sheets } from './sheetsClient'
 
@@ -41,6 +42,15 @@ async function resolveUser(account) {
   const user = users.find((u) => (u.email || '').toLowerCase() === account.email && u.active !== false && !u.archived)
   if (!user) throw new ApiError(403, { error: `Le compte ${account.email} n'est pas autorisé dans VLT Project Manager.` })
   return { id: user.id, email: account.email, name: user.name || account.name, role: user.role || 'member' }
+}
+
+/** Garde l'instantané local à jour après une écriture, pour les validations suivantes. */
+function remember(collection, item) {
+  if (!cache) return item
+  const list = cache[collection]
+  const i = list.findIndex((x) => x.id === item.id)
+  if (item.archived) { if (i >= 0) list.splice(i, 1) } else if (i >= 0) list.splice(i, 1, item); else list.push(item)
+  return item
 }
 
 function invalid(errors) {
@@ -126,7 +136,7 @@ export const sheetsBackend = {
     await sheets.appendRow('TASKS', task.id, task)
     await appendEvent({ type: 'task.created', entityType: 'task', entity: task.id, projectId: task.projectId, deliverableId: task.deliverableId, description: `Tâche créée : ${task.title}` })
     await bumpRevision()
-    return { task }
+    return { task: remember('tasks', task) }
   },
 
   async updateTask(id, changes, version) {
@@ -142,7 +152,7 @@ export const sheetsBackend = {
     // Les champs normalisés à la lecture (pôles, livrable) sont enregistrés sous leur forme actuelle.
     const normalized = pick(current, ['poles', 'deliverableId', 'links', 'checklist'])
     try {
-      return { task: await updateRow('TASKS', id, { ...normalized, ...patch }, version, taskEvent) }
+      return { task: remember('tasks', await updateRow('TASKS', id, { ...normalized, ...patch }, version, taskEvent)) }
     } catch (e) {
       // La version renvoyée en cas de conflit est lue telle quelle : on la normalise comme au chargement.
       if (e.current) e.current = normalizeAll({ ...cache, tasks: [e.current] }, cache.settings).tasks[0]
@@ -154,6 +164,73 @@ export const sheetsBackend = {
     const task = await updateRow('TASKS', id, { archived: true }, version, (before) => ({
       type: 'task.archived', entityType: 'task', projectId: before.projectId, description: `Tâche archivée : ${before.title}`,
     }))
-    return { task }
+    return { task: remember('tasks', task) }
+  },
+  async updateProject(id, changes, version) {
+    const current = cache.projects.find((p) => p.id === id) ?? {}
+    const patch = pick(changes, PROJECT_FIELDS)
+    const errors = validateProject({ ...current, ...patch })
+    if (Object.keys(errors).length) throw invalid(errors)
+    if ('clientId' in patch) patch.client = cache.clients.find((c) => c.id === patch.clientId)?.name ?? current.client
+    const project = await updateRow('PROJECTS', id, patch, version, (before, after) => {
+      const changes = diff(before, after, PROJECT_FIELDS)
+      if (!Object.keys(changes).length) return null
+      // Une nouvelle synthèse de situation est un événement à part : elle alimente le bilan mensuel.
+      const type = changes.situation ? 'project.situation_updated' : 'project.updated'
+      return { type, entityType: 'project', projectId: id, changes, description: `Projet modifié : ${after.name}` }
+    })
+    return { project: remember('projects', project) }
+  },
+
+  async createDeliverable(input) {
+    const data = { links: [], description: '', dueDate: '', ...pick(input, DELIVERABLE_FIELDS) }
+    const errors = validateDeliverable(data, cache)
+    if (Object.keys(errors).length) throw invalid(errors)
+    const ids = Object.keys(await sheets.readTab('DELIVERABLES'))
+    const stamp = now()
+    const deliverable = {
+      ...data, id: nextId('D', ids), validatedAt: '', deliveredAt: '', publishedAt: '',
+      version: 1, archived: false, createdAt: stamp, updatedAt: stamp, updatedBy: me.email,
+    }
+    await sheets.appendRow('DELIVERABLES', deliverable.id, deliverable)
+    await appendEvent({ type: 'deliverable.created', entityType: 'deliverable', entity: deliverable.id, projectId: deliverable.projectId, deliverableId: deliverable.id, description: `Livrable créé : ${deliverable.name}` })
+    await bumpRevision()
+    return { deliverable: remember('deliverables', deliverable) }
+  },
+
+  async updateDeliverable(id, changes, version) {
+    const current = cache.deliverables.find((d) => d.id === id) ?? {}
+    const patch = pick(changes, [...DELIVERABLE_FIELDS, 'archived'])
+    delete patch.projectId
+    const errors = validateDeliverable({ ...current, ...patch }, cache)
+    if (Object.keys(errors).length) throw invalid(errors)
+    const deliverable = await updateRow('DELIVERABLES', id, patch, version, (before, after) => {
+      const changes = diff(before, after, [...DELIVERABLE_FIELDS, 'archived'])
+      if (!Object.keys(changes).length) return null
+      const type = changes.archived ? 'deliverable.archived' : 'deliverable.updated'
+      return { type, entityType: 'deliverable', projectId: after.projectId, deliverableId: id, changes, description: `Livrable modifié : ${after.name}` }
+    })
+    return { deliverable: remember('deliverables', deliverable) }
+  },
+
+  /** action = validate | deliver | publish ; undo = true pour annuler un jalon saisi par erreur. */
+  async deliverableMilestone(id, action, { date, note = '', link = '', undo = false }, version) {
+    const milestone = MILESTONES[action]
+    if (!milestone) throw new ApiError(404, { error: 'Action inconnue.' })
+    if (!undo) {
+      const errors = validateMilestone({ date, link })
+      if (Object.keys(errors).length) throw invalid(errors)
+    }
+    const deliverable = await updateRow('DELIVERABLES', id, { [milestone.field]: undo ? '' : date }, version, (before, after) => ({
+      type: undo ? `${milestone.type}.cancelled` : milestone.type,
+      entityType: 'deliverable',
+      projectId: after.projectId,
+      deliverableId: id,
+      effectiveDate: undo ? before[milestone.field] : date,
+      note,
+      link,
+      description: `${undo ? 'Annulé : ' : ''}${milestone.description} : ${after.name}`,
+    }))
+    return { deliverable: remember('deliverables', deliverable) }
   },
 }
