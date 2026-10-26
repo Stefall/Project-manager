@@ -2,16 +2,16 @@ import { defineStore } from 'pinia'
 
 let toastId = 0
 
-function savedProject() {
-  try { return localStorage.getItem('vltpm.project') || '' } catch { return '' }
-}
+// Les versions précédentes mémorisaient le projet choisi ; ce choix n'est plus repris.
+try { localStorage.removeItem('vltpm.project') } catch { /* navigation privée */ }
 
 export const useUiStore = defineStore('ui', {
   state: () => ({
     quickAdd: { open: false, defaults: {} },
     // Panneau latéral d'édition : { kind: 'task' | 'project' | 'deliverable', id, defaults }
     editor: null,
-    currentProjectId: savedProject(),
+    // Filtre projet des pages Tâches et Planning ; non mémorisé : chaque session repart sur tous les projets.
+    currentProjectId: '',
     toasts: [],
   }),
   actions: {
@@ -29,7 +29,6 @@ export const useUiStore = defineStore('ui', {
     },
     selectProject(id) {
       this.currentProjectId = id
-      try { localStorage.setItem('vltpm.project', id) } catch { /* navigation privée */ }
     },
     toast(message, tone = 'info') {
       const id = ++toastId
