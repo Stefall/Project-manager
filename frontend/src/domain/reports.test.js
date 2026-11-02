@@ -90,3 +90,14 @@ test('bilan par livrable : jalons du mois et tâches terminées, ancien outil sa
   assert.deepEqual(byId[''].tasks.map((t) => t.id), ['T-4'])
   assert.equal(r.byDeliverable.at(-1).id, '')
 })
+
+test('situation : tâches ouvertes par livrable, bloquées d\'abord, pôles en couleur', () => {
+  const poles = [{ id: 'seo', label: 'SEO' }, { id: 'x', label: 'Autre / pôle' }]
+  const tasks3 = tasks.map((t) => ({ ...t, deliverableId: t.id === 'T-3' || t.id === 'T-2' ? 'D-2' : '', poles: t.id === 'T-2' ? ['seo', 'x'] : [] }))
+  const r = buildReport({ month: '2026-10', projectId: 'P-1', projects, deliverables, tasks: tasks3, events, poles, generatedAt: '2026-10-30T12:00:00Z' })
+  const [hub, hors] = r.snapshot.byDeliverable
+  assert.equal(hub.name, 'Hub')
+  assert.deepEqual(hub.tasks.map((t) => [t.id, t.status]), [['T-2', 'Bloqué'], ['T-3', 'En cours']])
+  assert.deepEqual(hub.tasks[0].poles.map((p) => [p.short, p.color]), [['SEO', '#2563eb'], ['Autre', '#a21caf']])
+  assert.equal(hors.id, '')
+})

@@ -43,7 +43,7 @@ watch(() => data.revision, () => load())
 const projects = computed(() => data.projects.filter((p) => !p.archived))
 const draft = computed(() => buildReport({
   month: month.value, projectId: projectId.value,
-  projects: data.projects, deliverables: data.deliverables, tasks: data.tasks, events: data.events,
+  projects: data.projects, deliverables: data.deliverables, tasks: data.tasks, events: data.events, poles: data.settings.poles,
 }))
 const versions = computed(() => versionsOf(data.reports, { month: month.value, projectId: projectId.value }))
 const current = computed(() => versions.value.find((v) => v.id === selected.value) ?? null)

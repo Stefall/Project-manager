@@ -1,4 +1,5 @@
 <script setup>
+import PoleTags from '@/components/PoleTags.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
@@ -25,7 +26,9 @@ watch([view, status], () => router.replace({ query: { ...route.query, view: view
 const tasks = computed(() => {
   const list = data.tasksFor(ui.currentProjectId).filter((t) => (!status.value || t.status === status.value) && (!pole.value || t.poles?.includes(pole.value)) && concerns(t))
   // Les tâches sans deadline vont en fin de liste : on n'invente jamais de date.
-  return [...list].sort((a, b) => (a[sortKey.value] || '￿').localeCompare(b[sortKey.value] || '￿'))
+  const key = (t) => t[sortKey.value] || '￿'
+  // Par livrable : les tâches d'un même livrable restent groupées, triées par échéance.
+  return [...list].sort((a, b) => key(a).localeCompare(key(b)) || (sortKey.value === 'deliverable' ? (a.deadline || '￿').localeCompare(b.deadline || '￿') : 0))
 })
 const columns = computed(() => data.settings.statuses.map((s) => ({ status: s.id, tasks: tasks.value.filter((t) => t.status === s.id) })))
 
@@ -72,7 +75,7 @@ async function changeStatus(task, next) {
         <select v-model="person"><option value="">Toutes</option><option v-for="p in data.people" :key="p.id" :value="p.id">{{ p.name }}</option></select>
       </label>
       <label class="field"><span>Trier par</span>
-        <select v-model="sortKey"><option value="deadline">Deadline</option><option value="title">Intitulé</option><option value="status">Statut</option></select>
+        <select v-model="sortKey"><option value="deadline">Deadline</option><option value="deliverable">Livrable</option><option value="title">Intitulé</option><option value="status">Statut</option></select>
       </label>
     </div>
 
@@ -97,7 +100,7 @@ async function changeStatus(task, next) {
               <option v-for="s in data.settings.statuses" :key="s.id">{{ s.id }}</option>
             </select>
           </td>
-          <td class="muted">{{ (t.poles || []).map(data.poleLabel).join(', ') }}</td>
+          <td><PoleTags :poles="t.poles || []" /></td>
           <td>{{ t.deadline ? formatDate(t.deadline) : '' }}<span v-if="!t.deadline && t.deadlineText" class="muted">{{ t.deadlineText }} (à préciser)</span></td>
         </tr>
       </tbody>
@@ -125,6 +128,7 @@ async function changeStatus(task, next) {
           @dragend="dragged = null; dragOver = null"
         >
           <button type="button" class="task-link" @click="ui.openEditor('task', t.id)">{{ t.title }}</button>
+          <PoleTags :poles="t.poles || []" />
           <p class="muted">{{ t.deliverable }}<template v-if="t.deadline"> · {{ formatDate(t.deadline) }}</template><template v-else-if="t.deadlineText"> · {{ t.deadlineText }}</template></p>
         </article>
       </section>
