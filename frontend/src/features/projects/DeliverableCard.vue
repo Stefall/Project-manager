@@ -44,7 +44,8 @@ async function changeStatus(task, status) {
 
     <div class="progress" role="img" :aria-label="`Avancement ${percent} %`"><span :style="{ width: `${percent}%` }" /></div>
 
-    <p v-if="deliverable.importNote" class="deliverable__note">{{ deliverable.importNote }}</p>
+    <!-- La note de reprise demande de confirmer la validation : elle disparaît une fois le livrable validé. -->
+    <p v-if="deliverable.importNote && !deliverable.validatedAt" class="deliverable__note">{{ deliverable.importNote }}</p>
     <MilestoneActions :deliverable="deliverable" />
 
     <ul class="deliverable__tasks">
