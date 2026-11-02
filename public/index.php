@@ -68,6 +68,8 @@ try {
     $router->add('GET', '/admin', $admin->index(...), $admins);
     $router->add('POST', '/admin/users', $admin->createUser(...), $admins);
     $router->add('PATCH', '/admin/users/{id}', $admin->updateUser(...), $admins);
+    $router->add('POST', '/admin/people', $admin->createPerson(...), $admins);
+    $router->add('PATCH', '/admin/people/{id}', $admin->updatePerson(...), $admins);
     $router->add('POST', '/admin/clients', $admin->createClient(...), $admins);
     $router->add('PATCH', '/admin/clients/{id}', $admin->updateClient(...), $admins);
     $router->add('POST', '/admin/projects', $admin->createProject(...), $admins);

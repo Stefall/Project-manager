@@ -46,6 +46,8 @@ Dépôt → **Settings → Pages → Source : GitHub Actions**. Chaque fusion da
 3. L'autoriser dans l'application : **Administration → Comptes → Autoriser un compte** (ou, à défaut, une ligne dans l'onglet `USERS` : colonne A `U-002`, colonne B
    `{"id":"U-002","email":"prenom@exemple.com","name":"Prénom","role":"member","active":true}`).
 
+Une personne qui doit seulement figurer dans l'équipe d'un projet (et recevoir le récap du lundi) n'a pas besoin de compte : on l'ajoute dans **Administration → Équipe** (onglet `PEOPLE` du Sheet), puis sur la fiche du projet.
+
 Dans la démo, le rôle administrateur est contrôlé par l'interface seulement : toute personne qui a le Sheet en éditeur peut techniquement le modifier. Le backend PHP, lui, vérifie le rôle côté serveur.
 
 ## Tester en local

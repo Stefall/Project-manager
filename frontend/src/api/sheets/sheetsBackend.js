@@ -4,6 +4,7 @@ import { DONE, settingsFrom } from '@/domain/settings'
 import { nextId, pick, TASK_FIELDS, taskEvent, validateTask } from '@/domain/tasks'
 import { DELIVERABLE_FIELDS, diff, MILESTONES, PROJECT_FIELDS, validateDeliverable, validateMilestone, validateProject } from '@/domain/projects'
 import { nextNumber } from '@/domain/reports'
+import { compactTeam, PERSON_FIELDS, validatePerson, validateTeam } from '@/domain/team'
 import { defaultPriority, publicUser, selfChangeError, USER_FIELDS, validateClient, validateSetting, validateUser } from '@/domain/admin'
 import { googleAuth } from './googleAuth'
 import { sheets } from './sheetsClient'
@@ -12,7 +13,7 @@ import { sheets } from './sheetsClient'
 // de la personne connectée. Même contrat que le backend PHP, avec le même contrôle de version, mais
 // sans verrou serveur : deux écritures exactement simultanées restent possibles (fenêtre de ~1 s).
 
-const TABS = ['CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS', 'USERS']
+const TABS = ['CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS', 'USERS', 'PEOPLE']
 const now = () => new Date().toISOString()
 let me = null
 let cache = null // dernier instantané, pour la validation
@@ -120,10 +121,11 @@ export const sheetsBackend = {
       projects: rowsOf(tabs.PROJECTS).filter((p) => !p.archived),
       deliverables: rowsOf(tabs.DELIVERABLES),
       tasks: rowsOf(tabs.TASKS).filter((t) => !t.archived),
+      people: rowsOf(tabs.PEOPLE).filter((p) => !p.archived),
     }
     const { projects, tasks } = normalizeAll(raw, settings)
     cache = { ...raw, projects, tasks, settings }
-    return { revision: rev, clients: raw.clients, projects, deliverables: raw.deliverables, tasks, settings }
+    return { revision: rev, clients: raw.clients, projects, deliverables: raw.deliverables, tasks, people: raw.people, settings }
   },
 
   async createTask(input) {
@@ -183,12 +185,18 @@ export const sheetsBackend = {
     const errors = validateProject({ ...current, ...patch })
     if (Object.keys(errors).length) throw invalid(errors)
     if ('clientId' in patch) patch.client = cache.clients.find((c) => c.id === patch.clientId)?.name ?? current.client
+    if ('team' in patch) {
+      const refused = validateTeam(patch.team, cache)
+      if (refused) throw invalid({ team: refused })
+      patch.team = compactTeam(patch.team)
+    }
     const project = await updateRow('PROJECTS', id, patch, version, (before, after) => {
       const changes = diff(before, after, PROJECT_FIELDS)
       if (!Object.keys(changes).length) return null
-      // Une nouvelle synthèse de situation est un événement à part : elle alimente le bilan mensuel.
-      const type = changes.situation ? 'project.situation_updated' : 'project.updated'
-      return { type, entityType: 'project', projectId: id, changes, description: `Projet modifié : ${after.name}` }
+      // Une nouvelle synthèse de situation ou une nouvelle équipe sont des événements à part.
+      const onlyTeam = Object.keys(changes).length === 1 && changes.team
+      const type = changes.situation ? 'project.situation_updated' : onlyTeam ? 'project.team_updated' : 'project.updated'
+      return { type, entityType: 'project', projectId: id, changes, description: `${onlyTeam ? 'Équipe modifiée' : 'Projet modifié'} : ${after.name}` }
     })
     return { project: remember('projects', project) }
   },
@@ -285,11 +293,12 @@ export const sheetsBackend = {
   /** Comptes, clients (archivés compris), éléments archivés et versions des paramètres. */
   async adminData() {
     requireAdmin()
-    const tabs = await sheets.readTabs(['USERS', 'CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS'])
+    const tabs = await sheets.readTabs(['USERS', 'CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS', 'PEOPLE'])
     const archived = (tab) => rowsOf(tabs[tab]).filter((x) => x.archived)
     return {
       users: rowsOf(tabs.USERS).map(publicUser),
       clients: rowsOf(tabs.CLIENTS),
+      people: rowsOf(tabs.PEOPLE),
       archived: { projects: archived('PROJECTS'), deliverables: archived('DELIVERABLES'), tasks: archived('TASKS') },
       settingVersions: Object.fromEntries(rowsOf(tabs.SETTINGS).map((r) => [r.id, r.version])),
     }
@@ -328,6 +337,42 @@ export const sheetsBackend = {
     })
     if (id === me.id) me = { ...me, name: user.name }
     return { user: publicUser(user) }
+  },
+
+  /** Annuaire : personnes qui peuvent faire partie d'une équipe et recevoir le récap, avec ou sans compte. */
+  async createPerson(input) {
+    requireAdmin()
+    const people = rowsOf(await sheets.readTab('PEOPLE'))
+    const data = { poles: [], external: false, digest: true, ...pick(input, PERSON_FIELDS) }
+    data.email = String(data.email ?? '').trim().toLowerCase()
+    data.name = String(data.name ?? '').trim()
+    const errors = validatePerson(data, { people, settings: cache.settings })
+    if (Object.keys(errors).length) throw invalid(errors)
+    const stamp = now()
+    const person = { ...data, id: nextId('PE', people.map((p) => p.id)), version: 1, archived: false, createdAt: stamp, updatedAt: stamp, updatedBy: me.email }
+    await sheets.appendRow('PEOPLE', person.id, person)
+    await appendEvent({ type: 'person.created', entityType: 'person', entity: person.id, description: `Personne ajoutée à l'annuaire : ${person.name}` })
+    await bumpRevision()
+    return { person }
+  },
+
+  async updatePerson(id, changes, version) {
+    requireAdmin()
+    const people = rowsOf(await sheets.readTab('PEOPLE'))
+    const current = people.find((p) => p.id === id)
+    if (!current) throw new ApiError(404, { error: 'Personne introuvable.' })
+    const patch = pick(changes, [...PERSON_FIELDS, 'archived'])
+    if ('email' in patch) patch.email = String(patch.email).trim().toLowerCase()
+    if ('name' in patch) patch.name = String(patch.name).trim()
+    const errors = validatePerson({ ...current, ...patch }, { people, settings: cache.settings })
+    if (Object.keys(errors).length) throw invalid(errors)
+    const person = await updateRow('PEOPLE', id, patch, version, (before, after) => {
+      const changed = diff(before, after, [...PERSON_FIELDS, 'archived'])
+      if (!Object.keys(changed).length) return null
+      const type = changed.archived ? (after.archived ? 'person.archived' : 'person.restored') : 'person.updated'
+      return { type, entityType: 'person', changes: changed, description: `Annuaire : ${after.name}` }
+    })
+    return { person }
   },
 
   async createClient(input) {
@@ -372,6 +417,11 @@ export const sheetsBackend = {
     if (!cache.clients.some((c) => c.id === data.clientId)) errors.clientId = 'Choisissez un client.'
     if (Object.keys(errors).length) throw invalid(errors)
     data.client = cache.clients.find((c) => c.id === data.clientId).name
+    if (data.team) {
+      const refused = validateTeam(data.team, cache)
+      if (refused) throw invalid({ team: refused })
+      data.team = compactTeam(data.team)
+    }
     const ids = Object.keys(await sheets.readTab('PROJECTS'))
     const stamp = now()
     const project = { ...data, name: data.name.trim(), id: nextId('P', ids), version: 1, archived: false, createdAt: stamp, updatedAt: stamp, updatedBy: me.email }

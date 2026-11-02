@@ -10,6 +10,7 @@ const routes = [
       { path: '', name: 'dashboard', component: () => import('@/features/dashboard/DashboardView.vue'), meta: { title: 'Dashboard' } },
       { path: 'projets', name: 'projects', component: () => import('@/features/projects/ProjectsView.vue'), meta: { title: 'Projets' } },
       { path: 'projets/:id', name: 'project', component: () => import('@/features/projects/ProjectView.vue'), meta: { title: 'Projet' } },
+      { path: 'semaine', name: 'week', component: () => import('@/features/week/WeekView.vue'), meta: { title: 'Ma semaine' } },
       { path: 'taches', name: 'tasks', component: () => import('@/features/tasks/TasksView.vue'), meta: { title: 'Tâches' } },
       { path: 'planning', name: 'planning', component: () => import('@/features/planning/PlanningView.vue'), meta: { title: 'Planning' } },
       { path: 'bilans', name: 'reports', component: () => import('@/features/reports/ReportsView.vue'), meta: { title: 'Bilans mensuels' } },

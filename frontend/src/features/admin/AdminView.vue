@@ -6,6 +6,7 @@ import { useDataStore } from '@/stores/data'
 import { useUiStore } from '@/stores/ui'
 import AdminUsers from './AdminUsers.vue'
 import AdminClients from './AdminClients.vue'
+import AdminPeople from './AdminPeople.vue'
 import AdminSettings from './AdminSettings.vue'
 import AdminArchives from './AdminArchives.vue'
 
@@ -17,6 +18,7 @@ const router = useRouter()
 
 const TABS = [
   { id: 'comptes', label: 'Comptes', component: AdminUsers },
+  { id: 'equipe', label: 'Équipe', component: AdminPeople },
   { id: 'clients', label: 'Clients et projets', component: AdminClients },
   { id: 'parametres', label: 'Pôles et paramètres', component: AdminSettings },
   { id: 'archives', label: 'Archives', component: AdminArchives },
@@ -60,7 +62,7 @@ provide('adminWrite', write)
     <header class="page-header">
       <div>
         <h1>Administration</h1>
-        <p>Comptes autorisés, clients et projets, pôles, paramètres et archives.</p>
+        <p>Comptes autorisés, équipe, clients et projets, pôles, paramètres et archives.</p>
       </div>
       <RouterLink class="history-link" :to="{ name: 'reports', query: { onglet: 'historique' } }">Historique des actions →</RouterLink>
     </header>

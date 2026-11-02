@@ -6,6 +6,7 @@ import { useUiStore } from '@/stores/ui'
 import { formatDate } from '@/components/useTaskStats'
 import StatusBadge from '@/design-system/components/StatusBadge.vue'
 import EmptyState from '@/design-system/components/EmptyState.vue'
+import { peopleOfTask } from '@/domain/team'
 
 const data = useDataStore()
 const ui = useUiStore()
@@ -15,11 +16,14 @@ const router = useRouter()
 const view = ref(route.query.view === 'kanban' ? 'kanban' : 'table')
 const status = ref(route.query.status ?? '')
 const pole = ref('')
+const person = ref(typeof route.query.personne === 'string' ? route.query.personne : '')
+// Une personne voit les tâches des pôles qu'elle tient sur chaque projet.
+const concerns = (t) => !person.value || peopleOfTask(t, data.projectById[t.projectId]).includes(person.value)
 const sortKey = ref('deadline')
 watch([view, status], () => router.replace({ query: { ...route.query, view: view.value, status: status.value || undefined } }))
 
 const tasks = computed(() => {
-  const list = data.tasksFor(ui.currentProjectId).filter((t) => (!status.value || t.status === status.value) && (!pole.value || t.poles?.includes(pole.value)))
+  const list = data.tasksFor(ui.currentProjectId).filter((t) => (!status.value || t.status === status.value) && (!pole.value || t.poles?.includes(pole.value)) && concerns(t))
   // Les tâches sans deadline vont en fin de liste : on n'invente jamais de date.
   return [...list].sort((a, b) => (a[sortKey.value] || '￿').localeCompare(b[sortKey.value] || '￿'))
 })
@@ -63,6 +67,9 @@ async function changeStatus(task, next) {
       </label>
       <label class="field"><span>Pôle</span>
         <select v-model="pole"><option value="">Tous</option><option v-for="p in data.settings.poles" :key="p.id" :value="p.id">{{ p.label }}</option></select>
+      </label>
+      <label v-if="data.people.length" class="field"><span>Personne</span>
+        <select v-model="person"><option value="">Toutes</option><option v-for="p in data.people" :key="p.id" :value="p.id">{{ p.name }}</option></select>
       </label>
       <label class="field"><span>Trier par</span>
         <select v-model="sortKey"><option value="deadline">Deadline</option><option value="title">Intitulé</option><option value="status">Statut</option></select>

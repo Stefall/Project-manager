@@ -14,7 +14,7 @@ use Vlt\Storage\Repository;
  */
 final class BootstrapController
 {
-    private const TABS = ['CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS'];
+    private const TABS = ['CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS', 'PEOPLE'];
 
     public function __construct(private readonly Repository $repo)
     {
@@ -40,6 +40,7 @@ final class BootstrapController
             'projects' => $data['PROJECTS'],
             'deliverables' => $data['DELIVERABLES'],
             'tasks' => array_values(array_filter($data['TASKS'], fn ($t) => !$t['archived'])),
+            'people' => array_values(array_filter($data['PEOPLE'], fn ($p) => !$p['archived'])),
             'settings' => (new Settings($settings))->toArray(),
         ];
     }

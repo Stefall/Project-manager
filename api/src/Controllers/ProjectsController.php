@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vlt\Controllers;
 
+use Vlt\Domain\Settings;
 use Vlt\Domain\Validator;
 use Vlt\Http\Request;
 use Vlt\Storage\Repository;
@@ -12,7 +13,7 @@ final class ProjectsController
 {
     public const FIELDS = [
         'name', 'clientId', 'client', 'summary', 'situation', 'description', 'objectives', 'scope', 'status',
-        'startDate', 'endDate', 'achievements', 'watchpoints', 'nextSteps', 'links',
+        'startDate', 'endDate', 'achievements', 'watchpoints', 'nextSteps', 'links', 'team',
     ];
 
     public const STATUSES = ['En cadrage', 'En production', 'En pause', 'Terminé'];
@@ -42,6 +43,11 @@ final class ProjectsController
         if (!empty($data['startDate']) && !empty($data['endDate'])) {
             $v->check($data['startDate'] <= $data['endDate'], 'endDate', 'La fin doit suivre le début.');
         }
+        if (array_key_exists('team', $changes)) {
+            $refused = self::teamError($changes['team'], $this->repo);
+            $v->check($refused === null, 'team', (string) $refused);
+            $changes['team'] = self::compactTeam($changes['team']);
+        }
         $v->validate();
 
         if (isset($changes['clientId'])) {
@@ -54,15 +60,44 @@ final class ProjectsController
                 if ($changed === []) {
                     return null;
                 }
+                // Une nouvelle synthèse de situation ou une nouvelle équipe sont des événements à part.
+                $onlyTeam = array_keys($changed) === ['team'];
                 return [
-                    'type' => isset($changed['situation']) ? 'project.situation_updated' : 'project.updated',
+                    'type' => isset($changed['situation']) ? 'project.situation_updated' : ($onlyTeam ? 'project.team_updated' : 'project.updated'),
                     'entityType' => 'project',
                     'projectId' => $id,
                     'changes' => $changed,
-                    'description' => 'Projet modifié : ' . $after['name'],
+                    'description' => ($onlyTeam ? 'Équipe modifiée : ' : 'Projet modifié : ') . $after['name'],
                 ];
             });
         return ['project' => $project];
+    }
+
+    /** Équipe = { pôle: [id de personne, …] }, avec des pôles et des personnes connus (même règle que domain/team.js). */
+    public static function teamError(mixed $team, Repository $repo): ?string
+    {
+        if (!is_array($team) || (array_is_list($team) && $team !== [])) {
+            return 'Équipe invalide.';
+        }
+        $poles = array_column(Settings::load($repo)->poles(), 'id');
+        $people = array_column($repo->all('PEOPLE'), 'id');
+        foreach ($team as $pole => $ids) {
+            if (!in_array($pole, $poles, true)) {
+                return "Pôle inconnu : $pole.";
+            }
+            if (!is_array($ids) || !array_is_list($ids) || count(array_unique($ids)) !== count($ids)) {
+                return 'Équipe invalide.';
+            }
+            if (array_diff($ids, $people) !== []) {
+                return 'Personne inconnue dans l\'équipe.';
+            }
+        }
+        return null;
+    }
+
+    public static function compactTeam(array $team): array
+    {
+        return array_filter($team, fn ($ids) => $ids !== []);
     }
 
     public static function diff(array $before, array $after, array $fields): array

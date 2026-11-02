@@ -16,6 +16,7 @@ const route = useRoute()
 
 const nav = computed(() => [
   { to: '/', label: 'Dashboard' },
+  { to: '/semaine', label: 'Ma semaine' },
   { to: '/projets', label: 'Projets' },
   { to: '/taches', label: 'Tâches' },
   { to: '/planning', label: 'Planning' },

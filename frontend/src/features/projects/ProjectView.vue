@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useUiStore } from '@/stores/ui'
@@ -8,6 +8,7 @@ import VButton from '@/design-system/components/VButton.vue'
 import StatusBadge from '@/design-system/components/StatusBadge.vue'
 import EmptyState from '@/design-system/components/EmptyState.vue'
 import DeliverableCard from './DeliverableCard.vue'
+import ProjectTeam from './ProjectTeam.vue'
 
 // Fiche projet : tout ce qu'il faut pour comprendre un projet en moins de 30 secondes.
 const route = useRoute()
@@ -19,6 +20,11 @@ const deliverables = computed(() => data.deliverablesFor(route.params.id))
 const tasks = computed(() => data.tasksFor(route.params.id))
 const loose = computed(() => tasks.value.filter((t) => !t.deliverableId))
 const stats = useTaskStats(tasks)
+// Lien direct vers une tâche (récap du lundi) : #/projets/P-001?tache=T-007 ouvre sa fiche.
+let opened = null
+watch(() => [route.query.tache, Boolean(data.taskById[route.query.tache])], ([id, found]) => {
+  if (found && id !== opened) { opened = id; ui.openEditor('task', id) }
+}, { immediate: true })
 
 </script>
 
@@ -74,6 +80,7 @@ const stats = useTaskStats(tasks)
       </section>
 
       <aside class="aside">
+        <ProjectTeam :project="project" />
         <section>
           <h2 class="section-title">Prochaines étapes</h2>
           <ol v-if="project.nextSteps?.length"><li v-for="s in project.nextSteps" :key="s">{{ s }}</li></ol>

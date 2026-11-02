@@ -2,7 +2,7 @@
 
 export const PROJECT_FIELDS = [
   'name', 'clientId', 'client', 'summary', 'situation', 'description', 'objectives', 'scope', 'status',
-  'startDate', 'endDate', 'achievements', 'watchpoints', 'nextSteps', 'links',
+  'startDate', 'endDate', 'achievements', 'watchpoints', 'nextSteps', 'links', 'team',
 ]
 
 export const PROJECT_STATUSES = ['En cadrage', 'En production', 'En pause', 'Terminé']

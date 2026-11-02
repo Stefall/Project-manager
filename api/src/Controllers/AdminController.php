@@ -32,11 +32,12 @@ final class AdminController
     public function index(Request $request): array
     {
         $this->assertStillAdmin($request);
-        $data = $this->repo->snapshot(['USERS', 'CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS']);
+        $data = $this->repo->snapshot(['USERS', 'CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS', 'PEOPLE']);
         $archived = fn (string $tab) => array_values(array_filter($data[$tab], fn ($x) => $x['archived']));
         return [
             'users' => array_map(self::publicUser(...), $data['USERS']),
             'clients' => $data['CLIENTS'],
+            'people' => $data['PEOPLE'],
             'archived' => ['projects' => $archived('PROJECTS'), 'deliverables' => $archived('DELIVERABLES'), 'tasks' => $archived('TASKS')],
             'settingVersions' => (object) array_column($data['SETTINGS'], 'version', 'id'),
         ];
@@ -96,6 +97,66 @@ final class AdminController
                 return ['type' => 'user.updated', 'entityType' => 'user', 'changes' => $changed, 'description' => "Compte $what : " . $after['email']];
             });
         return ['user' => self::publicUser($user)];
+    }
+
+    private const PERSON_FIELDS = ['name', 'email', 'poles', 'external', 'digest'];
+
+    /** Annuaire : personnes qui peuvent faire partie d'une équipe et recevoir le récap, avec ou sans compte. */
+    public function createPerson(Request $request): array
+    {
+        $this->assertStillAdmin($request);
+        $data = array_intersect_key($request->body, array_flip(self::PERSON_FIELDS)) + ['poles' => [], 'external' => false, 'digest' => true];
+        $data['email'] = mb_strtolower(trim((string) ($data['email'] ?? '')));
+        $data['name'] = trim((string) ($data['name'] ?? ''));
+        $this->validatePerson($data, null)->validate();
+        $person = $this->repo->create('PEOPLE', $data, $request->user['email'], Ids::sequential('PE'), [
+            'type' => 'person.created',
+            'entityType' => 'person',
+            'description' => "Personne ajoutée à l'annuaire : " . $data['name'],
+        ]);
+        return ['person' => $person];
+    }
+
+    public function updatePerson(Request $request): array
+    {
+        $this->assertStillAdmin($request);
+        $id = $request->params['id'];
+        $changes = array_intersect_key($request->body, array_flip([...self::PERSON_FIELDS, 'archived']));
+        if (isset($changes['email'])) {
+            $changes['email'] = mb_strtolower(trim((string) $changes['email']));
+        }
+        if (isset($changes['name'])) {
+            $changes['name'] = trim((string) $changes['name']);
+        }
+        $this->validatePerson(array_merge($this->repo->get('PEOPLE', $id), $changes), $id)->validate();
+        $fields = [...self::PERSON_FIELDS, 'archived'];
+        $person = $this->repo->update('PEOPLE', $id, $changes, $request->expectedVersion(), $request->user['email'],
+            function (array $before, array $after) use ($fields): ?array {
+                $changed = ProjectsController::diff($before, $after, $fields);
+                if ($changed === []) {
+                    return null;
+                }
+                $type = isset($changed['archived']) ? ($after['archived'] ? 'person.archived' : 'person.restored') : 'person.updated';
+                return ['type' => $type, 'entityType' => 'person', 'changes' => $changed, 'description' => 'Annuaire : ' . $after['name']];
+            });
+        return ['person' => $person];
+    }
+
+    private function validatePerson(array $data, ?string $id): Validator
+    {
+        $taken = false;
+        foreach ($this->repo->all('PEOPLE') as $p) {
+            if ($p['id'] !== $id && mb_strtolower($p['email'] ?? '') === mb_strtolower($data['email'] ?? '')) {
+                $taken = true;
+            }
+        }
+        $poles = array_column(Settings::load($this->repo)->poles(), 'id');
+        return (new Validator($data))
+            ->string('name', true, 120)
+            ->check(filter_var($data['email'] ?? '', FILTER_VALIDATE_EMAIL) !== false, 'email', 'Adresse e-mail invalide.')
+            ->check(!$taken, 'email', 'Cette personne existe déjà.')
+            ->subset('poles', $poles)
+            ->check(is_bool($data['external'] ?? false) && is_bool($data['digest'] ?? true), 'digest', 'Valeur invalide.');
     }
 
     public function createClient(Request $request): array
@@ -160,7 +221,14 @@ final class AdminController
         if (!empty($data['startDate']) && !empty($data['endDate'])) {
             $v->check($data['startDate'] <= $data['endDate'], 'endDate', 'La fin doit suivre le début.');
         }
+        if (array_key_exists('team', $data)) {
+            $refused = ProjectsController::teamError($data['team'], $this->repo);
+            $v->check($refused === null, 'team', (string) $refused);
+        }
         $v->validate();
+        if (isset($data['team'])) {
+            $data['team'] = ProjectsController::compactTeam($data['team']);
+        }
         $data['name'] = trim($data['name']);
         $data['client'] = $clients[$data['clientId']];
 

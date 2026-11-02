@@ -16,6 +16,7 @@ export const useDataStore = defineStore('data', {
     projects: [],
     deliverables: [],
     tasks: [],
+    people: [],
     settings: { statuses: [], priorities: [], poles: [] },
     loading: false,
     error: null,
@@ -33,6 +34,7 @@ export const useDataStore = defineStore('data', {
     deliverablesFor: (s) => (projectId) => s.deliverables.filter((d) => d.projectId === projectId && !d.archived),
     tasksFor: (s) => (projectId) => (projectId ? s.tasks.filter((t) => t.projectId === projectId) : s.tasks),
     tasksOfDeliverable: (s) => (deliverableId) => s.tasks.filter((t) => t.deliverableId === deliverableId),
+    personById: (s) => Object.fromEntries(s.people.map((p) => [p.id, p])),
     poleLabel: (s) => (id) => s.settings.poles.find((p) => p.id === id)?.label ?? id,
   },
 
@@ -49,6 +51,7 @@ export const useDataStore = defineStore('data', {
           const active = new Set(projects.map((p) => p.id))
           Object.assign(this, data, {
             clients: data.clients.filter((c) => !c.archived),
+            people: (data.people ?? []).filter((p) => !p.archived),
             projects,
             deliverables: data.deliverables.filter((d) => active.has(d.projectId)),
             tasks: normalized.tasks.filter((t) => active.has(t.projectId)),

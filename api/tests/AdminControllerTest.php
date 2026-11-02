@@ -31,6 +31,7 @@ final class AdminControllerTest extends TestCase
             'DELIVERABLES' => [['id', 'json']],
             'TASKS' => [['id', 'json'], $row(['id' => 'T-001', 'projectId' => 'P-001', 'title' => 'Maquettes', 'priority' => 'Haute', 'poles' => ['DA / Graphisme', 'seo']])],
             'SETTINGS' => [['id', 'json']],
+            'PEOPLE' => [['id', 'json']],
             'EVENTS' => [['id', 'json']],
             'META' => [['revision', 'updated_at', 'updated_by'], ['1', '', '']],
         ]));
@@ -120,5 +121,26 @@ final class AdminControllerTest extends TestCase
         }
         $this->expectExceptionMessage('Haute');
         $this->controller->updateSetting($this->request('POST', ['value' => ['Basse']], ['key' => 'priorities'], 0));
+    }
+
+    public function testDirectoryAndProjectTeam(): void
+    {
+        $person = $this->controller->createPerson($this->request('POST', ['name' => 'Tanguy', 'email' => 'Tanguy@VLT.fr', 'poles' => ['seo']]))['person'];
+        $this->assertSame(['PE-001', 'tanguy@vlt.fr', true], [$person['id'], $person['email'], $person['digest']]);
+        try {
+            $this->controller->createPerson($this->request('POST', ['name' => 'T', 'email' => 'tanguy@vlt.fr']));
+            $this->fail('Doublon accepté');
+        } catch (HttpException $e) {
+            $this->assertSame('Cette personne existe déjà.', $e->details['fields']['email']);
+        }
+
+        $projects = new \Vlt\Controllers\ProjectsController($this->repo);
+        $update = fn (array $team, int $version) => $projects->update($this->request('PATCH', ['team' => $team], ['id' => 'P-001'], $version))['project'];
+        $project = $update(['seo' => ['PE-001'], 'dev' => []], 1);
+        $this->assertSame(['seo' => ['PE-001']], $project['team']);
+        $this->assertSame('project.team_updated', $this->repo->all('EVENTS', true)[1]['type']);
+
+        $this->expectExceptionMessage('Certains champs');
+        $update(['seo' => ['PE-404']], 2);
     }
 }
