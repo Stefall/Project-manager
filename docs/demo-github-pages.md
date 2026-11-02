@@ -43,8 +43,10 @@ Dépôt → **Settings → Pages → Source : GitHub Actions**. Chaque fusion da
 
 1. Partager le Sheet de démo avec son compte Google, en **Éditeur**.
 2. L'ajouter comme utilisateur test dans l'écran de consentement OAuth.
-3. Ajouter une ligne dans l'onglet `USERS` : colonne A `U-002`, colonne B
-   `{"id":"U-002","email":"prenom@exemple.com","name":"Prénom","role":"member","active":true}`
+3. L'autoriser dans l'application : **Administration → Comptes → Autoriser un compte** (ou, à défaut, une ligne dans l'onglet `USERS` : colonne A `U-002`, colonne B
+   `{"id":"U-002","email":"prenom@exemple.com","name":"Prénom","role":"member","active":true}`).
+
+Dans la démo, le rôle administrateur est contrôlé par l'interface seulement : toute personne qui a le Sheet en éditeur peut techniquement le modifier. Le backend PHP, lui, vérifie le rôle côté serveur.
 
 ## Tester en local
 

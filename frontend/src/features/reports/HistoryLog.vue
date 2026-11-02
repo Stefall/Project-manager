@@ -19,10 +19,16 @@ const FAMILIES = [
   { id: 'deliverable', label: 'Livrables' },
   { id: 'project', label: 'Projets' },
   { id: 'report', label: 'Bilans' },
+  { id: 'admin', label: 'Administration' },
   { id: 'legacy', label: 'Ancien outil' },
 ]
 const LEGACY = ['validation', 'modification', 'archive']
-const familyOf = (e) => (LEGACY.includes(e.type) ? 'legacy' : (e.type || '').split('.')[0])
+const ADMIN = ['user', 'client', 'settings']
+function familyOf(e) {
+  if (LEGACY.includes(e.type)) return 'legacy'
+  const family = (e.type || '').split('.')[0]
+  return ADMIN.includes(family) ? 'admin' : family
+}
 
 const rows = computed(() => eventsOf(data.events, { month: props.month, projectId: props.projectId })
   .filter((e) => !family.value || familyOf(e) === family.value))

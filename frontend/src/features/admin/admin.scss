@@ -1,0 +1,23 @@
+// Styles partagés des sections de l'administration.
+.admin-section { display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
+.admin-section h2 { font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-muted); margin: 0; }
+.admin-hint { color: var(--ink-muted); font-size: var(--text-sm); margin: 0; max-width: 70ch; }
+.admin-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); padding: var(--space-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); .field { min-width: 180px; flex: 1 1 180px; } }
+// position: relative garde les textes « sr-only » des en-têtes dans la zone défilante (sinon la page déborde sur mobile).
+.admin-table-wrap { position: relative; overflow-x: auto; }
+.admin-table {
+  width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); font-size: var(--text-sm);
+  th { text-align: left; color: var(--ink-muted); font-weight: var(--weight-strong); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr.is-off td { color: var(--ink-muted); }
+  // Champs modifiables sur place : discrets au repos, encadrés au survol et au focus.
+  input[type='text'], select {
+    width: 100%; min-width: 120px; max-width: 280px; padding: var(--space-1) var(--space-2);
+    border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent;
+    &:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface); }
+    &:focus-visible { border-color: var(--ink); background: var(--surface); outline: none; }
+  }
+  .actions { text-align: right; white-space: nowrap; }
+}
+.admin-tag { display: inline-block; padding: 1px 8px; border-radius: var(--radius-pill); font-size: var(--text-xs); background: var(--surface-sunken); color: var(--ink-muted); }
+.admin-tag--on { background: var(--status-done-bg); color: var(--status-done); }

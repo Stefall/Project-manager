@@ -29,4 +29,13 @@ export const phpBackend = {
   listEvents: () => api.get('/events'),
   listReports: () => api.get('/reports'),
   createReport: (input) => api.post('/reports', input),
+
+  adminData: () => api.get('/admin'),
+  createUser: (input) => api.post('/admin/users', input),
+  updateUser: (id, changes, version) => api.patch(`/admin/users/${id}`, changes, version),
+  createClient: (input) => api.post('/admin/clients', input),
+  updateClient: (id, changes, version) => api.patch(`/admin/clients/${id}`, changes, version),
+  createProject: (input) => api.post('/admin/projects', input),
+  setArchived: (kind, id, archived, version) => api.post(`/admin/archive/${kind}/${id}`, { archived }, version),
+  updateSetting: (key, value, version) => api.post(`/admin/settings/${key}`, { value }, version),
 }

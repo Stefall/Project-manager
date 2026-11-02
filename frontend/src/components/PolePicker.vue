@@ -1,16 +1,19 @@
 <script setup>
+import { computed } from 'vue'
 import { useDataStore } from '@/stores/data'
 
 // Pôles en cases à cocher multisélection (jamais de responsables nominatifs).
 const model = defineModel({ type: Array, default: () => [] })
 const data = useDataStore()
+// Un pôle masqué par l'administration n'est plus proposé, sauf s'il est déjà coché sur la tâche.
+const poles = computed(() => data.settings.poles.filter((p) => !p.hidden || model.value.includes(p.id)))
 </script>
 
 <template>
   <fieldset class="pole-picker">
     <legend>Pôles concernés</legend>
     <div class="pole-picker__list">
-      <label v-for="pole in data.settings.poles" :key="pole.id" class="pole-picker__pole">
+      <label v-for="pole in poles" :key="pole.id" class="pole-picker__pole">
         <input v-model="model" type="checkbox" :value="pole.id" />
         <span>{{ pole.label }}</span>
       </label>

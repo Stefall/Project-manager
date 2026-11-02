@@ -43,8 +43,16 @@ export const useDataStore = defineStore('data', {
         const data = await backend.bootstrap(!force ? this.revision : null)
         if (!data.unchanged) {
           // Les lignes de l'ancien Apps Script sont complétées à la lecture, quel que soit le backend.
-          const { projects, tasks } = normalizeAll(data, data.settings)
-          Object.assign(this, data, { projects, tasks })
+          const normalized = normalizeAll(data, data.settings)
+          // Un projet archivé disparaît des écrans avec ses livrables et ses tâches (restaurables depuis l'administration).
+          const projects = normalized.projects.filter((p) => !p.archived)
+          const active = new Set(projects.map((p) => p.id))
+          Object.assign(this, data, {
+            clients: data.clients.filter((c) => !c.archived),
+            projects,
+            deliverables: data.deliverables.filter((d) => active.has(d.projectId)),
+            tasks: normalized.tasks.filter((t) => active.has(t.projectId)),
+          })
         }
         this.revision = data.revision
         this.error = null
@@ -133,6 +141,17 @@ export const useDataStore = defineStore('data', {
         await this.load({ force: true })
         await this.loadHistory({ force: true })
         return report
+      } finally {
+        this.pendingWrites--
+      }
+    },
+    /** Écriture d'administration : appelle le backend puis recharge tout, la plupart touchant plusieurs écrans. */
+    async adminWrite(call) {
+      this.pendingWrites++
+      try {
+        const result = await call(backend)
+        await this.load({ force: true })
+        return result
       } finally {
         this.pendingWrites--
       }
