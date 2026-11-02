@@ -75,3 +75,18 @@ test('historique du mois et versions', () => {
   assert.equal(nextNumber(reports, { month: '2026-10', projectId: 'P-1' }), 3)
   assert.equal(nextNumber(reports, { month: '2026-11' }), 1)
 })
+
+test('bilan par livrable : jalons du mois et tâches terminées, ancien outil sans date', () => {
+  const tasks2 = [
+    ...tasks.map((t) => ({ ...t, deliverableId: t.id === 'T-1' ? 'D-3' : '' })),
+    { id: 'T-7', projectId: 'P-1', title: 'Cadrage hub', status: 'Terminé', completedAt: '', deliverable: 'Hub' },
+  ]
+  const r = buildReport({ month: '2026-10', projectId: 'P-1', projects, deliverables, tasks: tasks2, events, generatedAt: '2026-10-30T12:00:00Z' })
+  const byId = Object.fromEntries(r.byDeliverable.map((d) => [d.id, d]))
+  assert.deepEqual(byId['D-3'].milestones, [{ key: 'delivered', date: '2026-10-28' }])
+  assert.deepEqual(byId['D-3'].tasks.map((t) => [t.id, t.date]), [['T-1', '2026-10-12']])
+  assert.deepEqual(byId['D-2'].tasks.map((t) => [t.id, t.date]), [['T-7', '']])
+  assert.deepEqual([byId['D-2'].done, byId['D-2'].total], [1, 1])
+  assert.deepEqual(byId[''].tasks.map((t) => t.id), ['T-4'])
+  assert.equal(r.byDeliverable.at(-1).id, '')
+})

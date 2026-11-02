@@ -17,6 +17,7 @@ const short = (iso) => SHORT.format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
 const long = (iso) => DATE.format(new Date(iso))
 
 const projectName = (id) => props.content.projects.find((p) => p.id === id)?.name ?? ''
+const STEP = { validated: 'Validé', delivered: 'Livré', published: 'Publié' }
 const multi = computed(() => props.content.projects.length > 1)
 const title = computed(() => (props.content.projectId ? props.content.projects[0]?.name : 'Tous les projets en cours'))
 const milestones = computed(() => Object.entries(props.content.milestones).filter(([, list]) => list.length))
@@ -53,31 +54,60 @@ const highlights = computed(() => [
       </div>
     </section>
 
-    <section class="report__section">
-      <h3>Livrables</h3>
-      <p v-if="!milestones.length" class="muted">Aucun livrable validé, livré ou publié ce mois-ci.</p>
-      <div v-for="[key, list] in milestones" :key="key">
-        <h4>{{ MILESTONE_LABELS[key] }}</h4>
-        <ul class="report__list">
-          <li v-for="m in list" :key="m.id"><span class="date">{{ short(m.date) }}</span> {{ m.name }}<span v-if="multi" class="muted"> · {{ projectName(m.projectId) }}</span></li>
+    <!-- Bilans récents : un bloc par livrable, comme sur la page projet. -->
+    <section v-if="content.byDeliverable" class="report__section">
+      <h3>Livrables et tâches terminées</h3>
+      <p v-if="!content.byDeliverable.length" class="muted">Aucun livrable validé, livré ou publié et aucune tâche terminée ce mois-ci.</p>
+      <div v-for="d in content.byDeliverable" :key="d.id || 'hors'" class="deliv">
+        <div class="deliv__head">
+          <h4>{{ d.id ? d.name : 'Hors livrable' }}<span v-if="multi && d.projectId" class="muted"> · {{ projectName(d.projectId) }}</span></h4>
+          <span v-if="d.id" class="muted">{{ d.done }}/{{ d.total }} tâche(s) terminée(s)</span>
+        </div>
+        <div v-if="d.total" class="deliv__bar" role="img" :aria-label="`Avancement ${Math.round((d.done / d.total) * 100)} %`">
+          <span :style="{ width: `${Math.round((d.done / d.total) * 100)}%` }" />
+        </div>
+        <ul v-if="d.milestones.length" class="deliv__milestones">
+          <li v-for="m in d.milestones" :key="m.key">✓ {{ STEP[m.key] }} le {{ short(m.date) }}</li>
         </ul>
+        <ul v-if="d.tasks.length" class="report__list">
+          <li v-for="t in d.tasks" :key="t.id">
+            <span class="date">{{ t.date ? short(t.date) : '—' }}</span> {{ t.title }}
+            <span v-if="!t.date" class="muted"> · terminée dans l'ancien outil, date inconnue</span>
+            <span v-if="t.reopened" class="tag">rouverte depuis</span>
+          </li>
+        </ul>
+        <p v-else class="muted">Aucune tâche terminée ce mois-ci.</p>
       </div>
     </section>
 
-    <section class="report__section">
-      <h3>Tâches terminées</h3>
-      <p v-if="!content.completedTasks.length" class="muted">Aucune tâche terminée avec une date dans ce mois.</p>
-      <ul class="report__list">
-        <li v-for="t in content.completedTasks" :key="t.id">
-          <span class="date">{{ short(t.date) }}</span> {{ t.title }}
-          <span v-if="t.deliverable" class="muted"> · {{ t.deliverable }}</span>
-          <span v-if="t.reopened" class="tag">rouverte depuis</span>
-        </li>
-      </ul>
-      <p v-if="content.undatedCompleted" class="muted">
-        {{ content.undatedCompleted }} tâche(s) terminée(s) dans l'ancien outil n'ont pas de date de fin : elles ne sont comptées dans aucun mois.
-      </p>
-    </section>
+    <!-- Versions figées avant le bilan par livrable : mise en page d'origine. -->
+    <template v-else>
+      <section class="report__section">
+        <h3>Livrables</h3>
+        <p v-if="!milestones.length" class="muted">Aucun livrable validé, livré ou publié ce mois-ci.</p>
+        <div v-for="[key, list] in milestones" :key="key">
+          <h4>{{ MILESTONE_LABELS[key] }}</h4>
+          <ul class="report__list">
+            <li v-for="m in list" :key="m.id"><span class="date">{{ short(m.date) }}</span> {{ m.name }}<span v-if="multi" class="muted"> · {{ projectName(m.projectId) }}</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="report__section">
+        <h3>Tâches terminées</h3>
+        <p v-if="!content.completedTasks.length" class="muted">Aucune tâche terminée avec une date dans ce mois.</p>
+        <ul class="report__list">
+          <li v-for="t in content.completedTasks" :key="t.id">
+            <span class="date">{{ short(t.date) }}</span> {{ t.title }}
+            <span v-if="t.deliverable" class="muted"> · {{ t.deliverable }}</span>
+            <span v-if="t.reopened" class="tag">rouverte depuis</span>
+          </li>
+        </ul>
+        <p v-if="content.undatedCompleted" class="muted">
+          {{ content.undatedCompleted }} tâche(s) terminée(s) dans l'ancien outil n'ont pas de date de fin : elles ne sont comptées dans aucun mois.
+        </p>
+      </section>
+    </template>
 
     <section class="report__section">
       <h3>Situation des tâches au {{ short(content.generatedAt) }}</h3>
@@ -105,7 +135,7 @@ const highlights = computed(() => [
       </ul>
     </section>
 
-    <section v-if="content.timeline.length" class="report__section report__timeline">
+    <section v-if="!content.byDeliverable && content.timeline.length" class="report__section report__timeline">
       <h3>Journal du mois</h3>
       <ul class="report__list">
         <li v-for="(e, i) in content.timeline" :key="i"><span class="date">{{ short(e.date) }}</span> {{ e.description }}</li>
@@ -141,6 +171,15 @@ const highlights = computed(() => [
   &__list { list-style: none; padding: 0 !important; display: grid; gap: 2px;
     .date { display: inline-block; min-width: 56px; color: var(--ink-muted); font-variant-numeric: tabular-nums; } }
   &__timeline { break-inside: auto; }
+}
+.deliv {
+  padding: var(--space-4) 0; border-top: 1px solid var(--line); break-inside: avoid;
+  &__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+    h4 { margin: 0 !important; font-size: var(--text-sm) !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--ink) !important; } }
+  &__bar { height: 3px; background: var(--line); border-radius: 2px; margin: var(--space-2) 0;
+    span { display: block; height: 100%; background: var(--ink); border-radius: 2px; } }
+  &__milestones { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 !important; margin: 0 0 var(--space-2) !important;
+    li { padding: 2px 10px; border-radius: var(--radius-pill); background: var(--status-done-bg); color: var(--status-done); font-size: var(--text-xs); font-weight: 600; } }
 }
 .tag { margin-left: var(--space-2); padding: 0 6px; border-radius: var(--radius-pill); background: var(--status-waiting-bg); color: var(--status-waiting); font-size: var(--text-xs); }
 

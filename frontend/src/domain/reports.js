@@ -106,6 +106,37 @@ function completedTasksOf({ month, events, tasks }) {
   return [...found.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/**
+ * Bilan par livrable : chaque livrable actif dans le mois (jalon atteint ou tâche terminée),
+ * avec ses jalons du mois et ses tâches terminées. Les tâches terminées sans date connue
+ * (ancien outil) sont listées sous leur livrable, sans date, sans être comptées dans le mois.
+ */
+function byDeliverableOf({ milestones, completed, deliverables, tasks, events }) {
+  const dated = new Set(events.filter((e) => e.type === 'task.completed').map((e) => e.entity))
+  const deliverableOf = (t) => t.deliverableId || deliverables.find((d) => d.projectId === t.projectId && d.name === t.deliverable)?.id || ''
+  const groups = new Map()
+  const group = (id) => {
+    if (!groups.has(id)) {
+      const d = deliverables.find((x) => x.id === id)
+      const own = tasks.filter((t) => deliverableOf(t) === id)
+      groups.set(id, {
+        id, name: d?.name ?? '', projectId: d?.projectId ?? own[0]?.projectId ?? '',
+        done: own.filter((t) => t.status === DONE).length, total: own.length, milestones: [], tasks: [],
+      })
+    }
+    return groups.get(id)
+  }
+  for (const [key, list] of Object.entries(milestones)) for (const m of list) group(m.id).milestones.push({ key, date: m.date })
+  const byId = Object.fromEntries(tasks.map((t) => [t.id, t]))
+  for (const c of completed) group(deliverableOf(byId[c.id])).tasks.push({ id: c.id, title: c.title, date: c.date, reopened: c.reopened })
+  for (const g of groups.values()) {
+    if (!g.id) continue
+    for (const t of tasks) if (deliverableOf(t) === g.id && t.status === DONE && !t.completedAt && !dated.has(t.id)) g.tasks.push({ id: t.id, title: t.title, date: '', reopened: false })
+  }
+  const order = (g) => (g.id ? deliverables.findIndex((d) => d.id === g.id) : Infinity)
+  return [...groups.values()].sort((a, b) => order(a) - order(b))
+}
+
 /** Tâches terminées sans aucune date de fin connue (reprises de l'ancien outil) : rangées dans aucun mois. */
 function undatedCompletedOf({ events, tasks }) {
   const dated = new Set(events.filter((e) => e.type === 'task.completed').map((e) => e.entity))
@@ -125,6 +156,8 @@ export function buildReport({ month, projectId = '', projects, deliverables, tas
   const scopeTasks = scoped(tasks)
   const nextMonth = shiftMonth(month, 1)
   const open = scopeTasks.filter((t) => t.status !== DONE)
+  const milestones = Object.fromEntries(MILESTONES.map((m) => [m.key, milestonesOf(m, { month, events: scoped(events), deliverables: scopeDeliverables })]))
+  const completedTasks = completedTasksOf({ month, events: scoped(events), tasks: scopeTasks })
   const light = (t) => ({ id: t.id, title: t.title, projectId: t.projectId, deliverable: t.deliverable || '', note: t.note || '' })
 
   return {
@@ -135,8 +168,9 @@ export function buildReport({ month, projectId = '', projects, deliverables, tas
       id: p.id, name: p.name, client: p.client || '', situation: p.situation || '',
       nextSteps: p.nextSteps ?? [], watchpoints: p.watchpoints ?? [],
     })),
-    milestones: Object.fromEntries(MILESTONES.map((m) => [m.key, milestonesOf(m, { month, events: scoped(events), deliverables: scopeDeliverables })])),
-    completedTasks: completedTasksOf({ month, events: scoped(events), tasks: scopeTasks }),
+    milestones,
+    completedTasks,
+    byDeliverable: byDeliverableOf({ milestones, completed: completedTasks, deliverables: scopeDeliverables, tasks: scopeTasks, events: scoped(events) }),
     undatedCompleted: undatedCompletedOf({ events: scoped(events), tasks: scopeTasks }),
     activity: {
       created: monthEvents.filter((e) => e.type === 'task.created').length,
