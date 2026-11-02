@@ -82,7 +82,11 @@ function milestonesOf(m, { month, events, deliverables }) {
   const cancelled = new Set(events.filter((e) => e.type === `${m.type}.cancelled`).map((e) => `${e.deliverableId}|${day(e.effectiveDate)}`))
   for (const e of events) {
     if (e.type === m.type && !cancelled.has(`${e.deliverableId}|${day(e.effectiveDate)}`)) add(byId[e.deliverableId], e.effectiveDate || e.date, 'historique')
-    if (m.legacy && e.type === m.legacy) add(byName(e.projectId, e.deliverable), e.date, 'ancien outil')
+    if (m.legacy && e.type === m.legacy) {
+      // Un jalon de l'ancien outil annulé depuis le nouvel outil (même livrable, même date) ne compte plus.
+      const d = byName(e.projectId, e.deliverable)
+      if (d && !cancelled.has(`${d.id}|${day(e.date)}`)) add(d, e.date, 'ancien outil')
+    }
   }
   // Un jalon annulé par la suite ne figure plus sur le livrable : seule la date actuelle compte ici.
   for (const d of deliverables) if (d[m.field]) add(d, d[m.field], 'fiche livrable')
@@ -100,6 +104,12 @@ function completedTasksOf({ month, events, tasks }) {
   for (const e of events) if (e.type === 'task.completed') add(e.entity, e.date)
   for (const t of tasks) if (t.completedAt) add(t.id, t.completedAt)
   return [...found.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/** Tâches terminées sans aucune date de fin connue (reprises de l'ancien outil) : rangées dans aucun mois. */
+function undatedCompletedOf({ events, tasks }) {
+  const dated = new Set(events.filter((e) => e.type === 'task.completed').map((e) => e.entity))
+  return tasks.filter((t) => t.status === DONE && !t.completedAt && !dated.has(t.id)).length
 }
 
 /**
@@ -127,6 +137,7 @@ export function buildReport({ month, projectId = '', projects, deliverables, tas
     })),
     milestones: Object.fromEntries(MILESTONES.map((m) => [m.key, milestonesOf(m, { month, events: scoped(events), deliverables: scopeDeliverables })])),
     completedTasks: completedTasksOf({ month, events: scoped(events), tasks: scopeTasks }),
+    undatedCompleted: undatedCompletedOf({ events: scoped(events), tasks: scopeTasks }),
     activity: {
       created: monthEvents.filter((e) => e.type === 'task.created').length,
       statusChanges: monthEvents.filter((e) => e.type === 'task.status_changed' || e.type === 'task.completed').length,

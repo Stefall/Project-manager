@@ -15,9 +15,12 @@ const tasks = [
   { id: 'T-3', projectId: 'P-1', title: 'Intégration', status: 'En cours', deadline: '2026-11-04' },
   { id: 'T-4', projectId: 'P-1', title: 'Reprise', status: 'En cours' },
   { id: 'T-5', projectId: 'P-2', title: 'Cadrage', status: 'Terminé', completedAt: '2026-09-30T10:00:00Z' },
+  { id: 'T-6', projectId: 'P-1', title: 'Ancienne', status: 'Terminé', completedAt: '' },
 ]
 const events = [
   { type: 'validation', projectId: 'P-1', deliverable: 'Hub', date: '2026-10-22T10:13:27Z' },
+  { type: 'validation', projectId: 'P-1', deliverable: 'Page Corpo', date: '2026-10-22T10:16:10Z' },
+  { type: 'deliverable.validated.cancelled', projectId: 'P-1', deliverableId: 'D-3', effectiveDate: '2026-10-22', date: '2026-11-02T14:09:44Z' },
   { type: 'deliverable.delivered', projectId: 'P-1', deliverableId: 'D-3', effectiveDate: '2026-10-28', date: '2026-10-29T08:00:00Z', author: 'a@vlt.fr' },
   { type: 'deliverable.published', projectId: 'P-1', deliverableId: 'D-1', effectiveDate: '2026-10-20', date: '2026-10-20T08:00:00Z' },
   { type: 'deliverable.published.cancelled', projectId: 'P-1', deliverableId: 'D-1', effectiveDate: '2026-10-20', date: '2026-10-21T08:00:00Z' },
@@ -32,6 +35,15 @@ const report = buildReport({ month: '2026-10', projectId: 'P-1', projects, deliv
 test('jalons reconstitués depuis l\'historique, l\'ancien outil et la fiche', () => {
   assert.deepEqual(report.milestones.validated.map((m) => [m.id, m.date, m.source]), [['D-2', '2026-10-22', 'ancien outil'], ['D-1', '2026-10-22', 'fiche livrable']])
   assert.deepEqual(report.milestones.delivered.map((m) => [m.id, m.source]), [['D-3', 'historique']])
+})
+
+test('une validation de l\'ancien outil annulée depuis n\'apparaît plus', () => {
+  assert.ok(!report.milestones.validated.some((m) => m.id === 'D-3'))
+})
+
+test('tâches terminées sans date comptées à part', () => {
+  assert.equal(report.undatedCompleted, 1)
+  assert.ok(!report.completedTasks.some((t) => t.id === 'T-6'))
 })
 
 test('une publication annulée n\'apparaît pas', () => {

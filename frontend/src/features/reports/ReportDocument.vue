@@ -66,7 +66,7 @@ const highlights = computed(() => [
 
     <section class="report__section">
       <h3>Tâches terminées</h3>
-      <p v-if="!content.completedTasks.length" class="muted">Aucune tâche terminée ce mois-ci.</p>
+      <p v-if="!content.completedTasks.length" class="muted">Aucune tâche terminée avec une date dans ce mois.</p>
       <ul class="report__list">
         <li v-for="t in content.completedTasks" :key="t.id">
           <span class="date">{{ short(t.date) }}</span> {{ t.title }}
@@ -74,6 +74,9 @@ const highlights = computed(() => [
           <span v-if="t.reopened" class="tag">rouverte depuis</span>
         </li>
       </ul>
+      <p v-if="content.undatedCompleted" class="muted">
+        {{ content.undatedCompleted }} tâche(s) terminée(s) dans l'ancien outil n'ont pas de date de fin : elles ne sont comptées dans aucun mois.
+      </p>
     </section>
 
     <section class="report__section">
