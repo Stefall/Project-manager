@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 import { MILESTONE_LABELS } from '@/domain/reports'
+import StatusBadge from '@/design-system/components/StatusBadge.vue'
+import PoleTags from '@/components/PoleTags.vue'
 
 // Mise en page d'un bilan (aperçu ou version figée), pensée aussi pour l'impression en PDF.
 // N'utilise que le contenu du bilan : une version figée se relit à l'identique.
@@ -115,7 +117,20 @@ const highlights = computed(() => [
         {{ content.snapshot.done }} terminée(s) sur {{ content.snapshot.total }} · {{ content.snapshot.inProgress }} en cours ·
         {{ content.snapshot.todo }} à faire · {{ content.snapshot.waiting.length }} en attente · {{ content.snapshot.blocked.length }} bloquée(s)
       </p>
-      <div class="report__cols">
+      <!-- Bilans récents : tâches non terminées classées par livrable, avec leurs pôles en couleur. -->
+      <div v-if="content.snapshot.byDeliverable">
+        <div v-for="g in content.snapshot.byDeliverable" :key="g.id || 'hors'" class="open">
+          <h4 class="open__title">{{ g.id ? g.name : 'Hors livrable' }}<span v-if="multi && g.projectId" class="muted"> · {{ projectName(g.projectId) }}</span></h4>
+          <ul class="open__list">
+            <li v-for="t in g.tasks" :key="t.id">
+              <StatusBadge :status="t.status" class="open__status" />
+              <span class="open__text">{{ t.title }}<span v-if="t.note" class="muted"> — {{ t.note }}</span></span>
+              <PoleTags :poles="t.poles" />
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div v-else class="report__cols">
         <div v-if="content.snapshot.blocked.length">
           <h4>Bloquées</h4>
           <ul><li v-for="t in content.snapshot.blocked" :key="t.id">{{ t.title }}<span v-if="t.note" class="muted"> — {{ t.note }}</span></li></ul>
@@ -180,6 +195,14 @@ const highlights = computed(() => [
     span { display: block; height: 100%; background: var(--ink); border-radius: 2px; } }
   &__milestones { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 !important; margin: 0 0 var(--space-2) !important;
     li { padding: 2px 10px; border-radius: var(--radius-pill); background: var(--status-done-bg); color: var(--status-done); font-size: var(--text-xs); font-weight: 600; } }
+}
+.open {
+  margin-top: var(--space-4); break-inside: avoid;
+  &__title { margin: 0 0 var(--space-1) !important; font-size: var(--text-sm) !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--ink) !important; }
+  &__list { list-style: none; padding: 0 !important; display: grid; gap: 4px;
+    li { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; } }
+  &__status { flex: 0 0 auto; }
+  &__text { flex: 1 1 200px; min-width: 0; }
 }
 .tag { margin-left: var(--space-2); padding: 0 6px; border-radius: var(--radius-pill); background: var(--status-waiting-bg); color: var(--status-waiting); font-size: var(--text-xs); }
 

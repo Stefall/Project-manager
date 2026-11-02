@@ -1,4 +1,5 @@
 <script setup>
+import PoleTags from '@/components/PoleTags.vue'
 import { computed, ref } from 'vue'
 import { useDataStore } from '@/stores/data'
 import { useUiStore } from '@/stores/ui'
@@ -56,6 +57,7 @@ async function changeStatus(task, status) {
         </select>
         <StatusBadge :status="t.status" class="badge" />
         <button type="button" class="task" :disabled="t.pending" :title="'Modifier la tâche'" @click="ui.openEditor('task', t.id)">{{ t.title }}</button>
+        <PoleTags :poles="t.poles || []" class="deliverable__poles" />
         <span class="deliverable__date">{{ t.deadline ? formatDate(t.deadline) : t.deadlineText }}</span>
       </li>
       <li v-if="!tasks.length" class="muted">Aucune tâche pour ce livrable.</li>
@@ -87,6 +89,8 @@ async function changeStatus(task, status) {
     list-style: none; margin: 0; padding: 0; display: grid; font-size: var(--text-sm);
     li { position: relative; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); min-width: 0; &:hover { background: var(--surface-sunken); } }
     li.pending { opacity: 0.6; }
+    :deep(.deliverable__poles) { flex: 0 0 auto; }
+    @include below($bp-tablet) { li { flex-wrap: wrap; } :deep(.deliverable__poles) { order: 5; flex-basis: 100%; } }
     .task { flex: 1 1 auto; min-width: 0; border: 0; background: none; padding: var(--space-1) 0; text-align: left; cursor: pointer; font: inherit; color: inherit; &:hover { text-decoration: underline; } }
   }
   &__date { margin-left: auto; color: var(--ink-muted); font-size: var(--text-xs); white-space: nowrap; }

@@ -1,7 +1,10 @@
 // Bilan mensuel reconstitué à partir de l'historique (onglet EVENTS), puis figé tel quel dans REPORTS.
 // Une tâche terminée, un livrable validé, livré ou publié sont trois faits distincts, chacun daté.
 
+import { poleInfo } from './poles.js'
+
 const DONE = 'Terminé'
+const OPEN_ORDER = ['Bloqué', 'En attente', 'En cours', 'À faire']
 
 const MILESTONES = [
   { key: 'validated', type: 'deliverable.validated', field: 'validatedAt', legacy: 'validation', label: 'Livrables validés' },
@@ -147,7 +150,28 @@ function undatedCompletedOf({ events, tasks }) {
  * Contenu complet d'un bilan, autonome : il ne référence rien qui pourrait changer ensuite,
  * de sorte qu'une version figée se relit à l'identique.
  */
-export function buildReport({ month, projectId = '', projects, deliverables, tasks, events, generatedAt = new Date().toISOString() }) {
+/** Tâches non terminées regroupées par livrable (hors livrable en dernier), avec pôles résolus pour rester lisibles une fois figées. */
+function openByDeliverableOf({ open, deliverables, poles }) {
+  const deliverableOf = (t) => t.deliverableId || deliverables.find((d) => d.projectId === t.projectId && d.name === t.deliverable)?.id || ''
+  const groups = new Map()
+  for (const t of open) {
+    const id = deliverableOf(t)
+    if (!groups.has(id)) {
+      const d = deliverables.find((x) => x.id === id)
+      groups.set(id, { id, name: d?.name ?? '', projectId: d?.projectId ?? t.projectId, tasks: [] })
+    }
+    groups.get(id).tasks.push({
+      id: t.id, title: t.title, status: t.status, note: t.note || '', deadline: t.deadline || '',
+      poles: (t.poles ?? []).map((p) => poleInfo(p, poles)),
+    })
+  }
+  const rank = (s) => (OPEN_ORDER.indexOf(s) + 5) % 5
+  for (const g of groups.values()) g.tasks.sort((a, b) => rank(a.status) - rank(b.status))
+  const order = (g) => (g.id ? deliverables.findIndex((d) => d.id === g.id) : Infinity)
+  return [...groups.values()].sort((a, b) => order(a) - order(b))
+}
+
+export function buildReport({ month, projectId = '', projects, deliverables, tasks, events, poles = [], generatedAt = new Date().toISOString() }) {
   const scope = projects.filter((p) => !p.archived && (!projectId || p.id === projectId))
   const ids = new Set(scope.map((p) => p.id))
   const scoped = (list) => list.filter((x) => ids.has(x.projectId))
@@ -185,6 +209,7 @@ export function buildReport({ month, projectId = '', projects, deliverables, tas
       todo: open.filter((t) => t.status === 'À faire').length,
       done: scopeTasks.length - open.length,
       total: scopeTasks.length,
+      byDeliverable: openByDeliverableOf({ open, deliverables: scopeDeliverables, poles }),
     },
     upcoming: open
       // Échéances à venir, de la date de génération à la fin du mois suivant.
