@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import { useUiStore } from '@/stores/ui'
@@ -20,6 +20,11 @@ const deliverables = computed(() => data.deliverablesFor(route.params.id))
 const tasks = computed(() => data.tasksFor(route.params.id))
 const loose = computed(() => tasks.value.filter((t) => !t.deliverableId))
 const stats = useTaskStats(tasks)
+// Lien direct vers une tâche (récap du lundi) : #/projets/P-001?tache=T-007 ouvre sa fiche.
+let opened = null
+watch(() => [route.query.tache, Boolean(data.taskById[route.query.tache])], ([id, found]) => {
+  if (found && id !== opened) { opened = id; ui.openEditor('task', id) }
+}, { immediate: true })
 
 </script>
 
