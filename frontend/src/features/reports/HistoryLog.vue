@@ -23,7 +23,7 @@ const FAMILIES = [
   { id: 'legacy', label: 'Ancien outil' },
 ]
 const LEGACY = ['validation', 'modification', 'archive']
-const ADMIN = ['user', 'client', 'settings']
+const ADMIN = ['user', 'client', 'settings', 'person']
 function familyOf(e) {
   if (LEGACY.includes(e.type)) return 'legacy'
   const family = (e.type || '').split('.')[0]

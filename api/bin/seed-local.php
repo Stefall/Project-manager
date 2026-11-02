@@ -48,6 +48,7 @@ $sheet = [
     'EVENTS' => [['id', 'json']],
     'NOTES' => [['id', 'json']],
     'REPORTS' => [['id', 'json']],
+    'PEOPLE' => [['id', 'json']],
     'USERS' => [['id', 'json'], ...array_map($row, $users)],
     'SETTINGS' => [['id', 'json']],
     'META' => [['revision', 'updated_at', 'updated_by'], ['1', date('c'), 'seed']],

@@ -12,6 +12,7 @@ const archivedProject = computed(() => new Set(props.admin.archived.projects.map
 const projectName = (id) => props.admin.archived.projects.find((p) => p.id === id)?.name
 
 const groups = computed(() => [
+  { kind: 'person', title: 'Personnes de l\'annuaire', items: (props.admin.people ?? []).filter((p) => p.archived), label: (p) => `${p.name} · ${p.email}` },
   { kind: 'client', title: 'Clients', items: props.admin.clients.filter((c) => c.archived), label: (c) => c.name },
   { kind: 'project', title: 'Projets', items: props.admin.archived.projects, label: (p) => `${p.client ? `${p.client} · ` : ''}${p.name}` },
   { kind: 'deliverable', title: 'Livrables', items: props.admin.archived.deliverables, label: (d) => d.name },
@@ -20,9 +21,10 @@ const groups = computed(() => [
 
 function restore(kind, item) {
   const name = item.name ?? item.title
-  const call = kind === 'client'
-    ? (b) => b.updateClient(item.id, { archived: false }, item.version)
-    : (b) => b.setArchived(kind, item.id, false, item.version)
+  const call = {
+    client: (b) => b.updateClient(item.id, { archived: false }, item.version),
+    person: (b) => b.updatePerson(item.id, { archived: false }, item.version),
+  }[kind] ?? ((b) => b.setArchived(kind, item.id, false, item.version))
   write(call, `« ${name} » restauré.`)
 }
 </script>

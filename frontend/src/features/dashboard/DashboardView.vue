@@ -6,6 +6,8 @@ import { formatDate, useTaskStats } from '@/components/useTaskStats'
 import VCard from '@/design-system/components/VCard.vue'
 import StatusBadge from '@/design-system/components/StatusBadge.vue'
 import EmptyState from '@/design-system/components/EmptyState.vue'
+import PersonAvatar from '@/components/PersonAvatar.vue'
+import { teamMembers } from '@/domain/team'
 
 const data = useDataStore()
 const ui = useUiStore()
@@ -74,7 +76,12 @@ const statusRow = computed(() => [
             <div class="progress" role="img" :aria-label="`Avancement ${percent(p.id)} %`">
               <span :style="{ width: `${percent(p.id)}%` }" />
             </div>
-            <p class="project-card__meta">{{ percent(p.id) }} % · {{ plural(perProject(p.id).length, 'tâche') }}</p>
+            <div class="project-card__foot">
+              <p class="project-card__meta">{{ percent(p.id) }} % · {{ plural(perProject(p.id).length, 'tâche') }}</p>
+              <span v-if="teamMembers(p, data.people).length" class="team" :aria-label="`Équipe : ${teamMembers(p, data.people).map((m) => m.name).join(', ')}`">
+                <PersonAvatar v-for="m in teamMembers(p, data.people)" :key="m.id" :person="m" size="sm" />
+              </span>
+            </div>
           </VCard>
         </section>
 
@@ -121,7 +128,9 @@ const statusRow = computed(() => [
   &__client { margin: 0; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-muted); }
   &__summary { margin: 0 0 var(--space-3); }
   &__situation { margin: 0 0 var(--space-4); color: var(--ink-muted); font-size: var(--text-sm); }
-  &__meta { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--ink-muted); }
+  &__meta { margin: 0; font-size: var(--text-xs); color: var(--ink-muted); }
+  &__foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+  .team { display: inline-flex; > * + * { margin-left: -6px; } }
 }
 .progress { height: 6px; background: var(--surface-sunken); border-radius: var(--radius-pill); overflow: hidden; span { display: block; height: 100%; background: var(--ink); } }
 .list-title { font-size: var(--text-sm); margin: var(--space-4) 0 var(--space-2); &:first-child { margin-top: 0; } }

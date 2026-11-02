@@ -8,6 +8,7 @@ import VButton from '@/design-system/components/VButton.vue'
 import StatusBadge from '@/design-system/components/StatusBadge.vue'
 import EmptyState from '@/design-system/components/EmptyState.vue'
 import DeliverableCard from './DeliverableCard.vue'
+import ProjectTeam from './ProjectTeam.vue'
 
 // Fiche projet : tout ce qu'il faut pour comprendre un projet en moins de 30 secondes.
 const route = useRoute()
@@ -74,6 +75,7 @@ const stats = useTaskStats(tasks)
       </section>
 
       <aside class="aside">
+        <ProjectTeam :project="project" />
         <section>
           <h2 class="section-title">Prochaines étapes</h2>
           <ol v-if="project.nextSteps?.length"><li v-for="s in project.nextSteps" :key="s">{{ s }}</li></ol>

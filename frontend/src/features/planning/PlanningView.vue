@@ -6,6 +6,7 @@ import { useUiStore } from '@/stores/ui'
 import { DONE } from '@/domain/settings'
 import { buildGantt, calendarEvents, shiftMonth, timelineRange, todayIso, undatedItems } from '@/domain/planning'
 import EmptyState from '@/design-system/components/EmptyState.vue'
+import { peopleOfTask } from '@/domain/team'
 import GanttChart from './GanttChart.vue'
 import CalendarMonth from './CalendarMonth.vue'
 import UndatedList from './UndatedList.vue'
@@ -20,17 +21,19 @@ const view = ref(route.query.view === 'calendrier' ? 'calendar' : 'gantt')
 const zoom = ref('ajuste')
 const month = ref(/^\d{4}-\d{2}$/.test(route.query.mois ?? '') ? route.query.mois : today.slice(0, 7))
 const pole = ref('')
+const person = ref('')
 const status = ref('')
 const showDone = ref(false)
 watch([view, month], () => router.replace({ query: { view: view.value === 'calendar' ? 'calendrier' : undefined, mois: view.value === 'calendar' ? month.value : undefined } }))
 
 const projects = computed(() => data.projects.filter((p) => !p.archived && (!ui.currentProjectId || p.id === ui.currentProjectId)))
-const filtering = computed(() => Boolean(pole.value || status.value))
+const filtering = computed(() => Boolean(pole.value || status.value || person.value))
 const tasks = computed(() => data.tasks.filter((t) =>
   projects.value.some((p) => p.id === t.projectId)
   && (showDone.value || status.value === DONE || t.status !== DONE)
   && (!status.value || t.status === status.value)
-  && (!pole.value || t.poles?.includes(pole.value))))
+  && (!pole.value || t.poles?.includes(pole.value))
+  && (!person.value || peopleOfTask(t, data.projectById[t.projectId]).includes(person.value))))
 // Avec un filtre pôle ou statut, un livrable n'apparaît que s'il garde au moins une tâche.
 const deliverables = computed(() => data.deliverables.filter((d) =>
   projects.value.some((p) => p.id === d.projectId) && (!filtering.value || tasks.value.some((t) => t.deliverableId === d.id))))
@@ -66,6 +69,9 @@ const monthCount = computed(() => events.value.filter((e) => e.date.startsWith(m
       </label>
       <label class="field"><span>Statut</span>
         <select v-model="status"><option value="">Tous</option><option v-for="s in data.settings.statuses" :key="s.id">{{ s.id }}</option></select>
+      </label>
+      <label v-if="data.people.length" class="field"><span>Personne</span>
+        <select v-model="person"><option value="">Toutes</option><option v-for="p in data.people" :key="p.id" :value="p.id">{{ p.name }}</option></select>
       </label>
       <label class="check"><input v-model="showDone" type="checkbox" :disabled="status === DONE"> Afficher les tâches terminées</label>
 
