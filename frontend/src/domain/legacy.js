@@ -18,9 +18,14 @@ export function normalizePoles(poles, settings) {
 
 export function normalizeAll({ clients, projects, deliverables, tasks }, settings) {
   const clientByName = Object.fromEntries(clients.map((c) => [c.name, c.id]))
+  const clientById = Object.fromEntries(clients.map((c) => [c.id, c.name]))
   const deliverableByKey = Object.fromEntries(deliverables.map((d) => [`${d.projectId}|${d.name}`, d.id]))
   return {
-    projects: projects.map((p) => ({ ...p, clientId: p.clientId || clientByName[p.client] || '' })),
+    // Le nom du client suit la fiche client (renommage), le nom enregistré sur le projet sert de repli.
+    projects: projects.map((p) => {
+      const clientId = p.clientId || clientByName[p.client] || ''
+      return { ...p, clientId, client: clientById[clientId] ?? p.client ?? '' }
+    }),
     tasks: tasks.map((t) => ({
       ...t,
       deliverableId: t.deliverableId || deliverableByKey[`${t.projectId}|${t.deliverable}`] || '',

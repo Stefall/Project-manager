@@ -3,6 +3,8 @@ import { normalizeAll, withDefaults } from '@/domain/legacy'
 import { DONE, settingsFrom } from '@/domain/settings'
 import { nextId, pick, TASK_FIELDS, taskEvent, validateTask } from '@/domain/tasks'
 import { DELIVERABLE_FIELDS, diff, MILESTONES, PROJECT_FIELDS, validateDeliverable, validateMilestone, validateProject } from '@/domain/projects'
+import { nextNumber } from '@/domain/reports'
+import { defaultPriority, publicUser, selfChangeError, USER_FIELDS, validateClient, validateSetting, validateUser } from '@/domain/admin'
 import { googleAuth } from './googleAuth'
 import { sheets } from './sheetsClient'
 
@@ -51,6 +53,11 @@ function remember(collection, item) {
   const i = list.findIndex((x) => x.id === item.id)
   if (item.archived) { if (i >= 0) list.splice(i, 1) } else if (i >= 0) list.splice(i, 1, item); else list.push(item)
   return item
+}
+
+function requireAdmin() {
+  // Garde-fou d'interface : en démo, l'accès réel est donné par le partage du Sheet. Le backend PHP le vérifie côté serveur.
+  if (me?.role !== 'admin') throw new ApiError(403, { error: 'Réservé aux administrateurs.' })
 }
 
 function invalid(errors) {
@@ -120,7 +127,7 @@ export const sheetsBackend = {
   },
 
   async createTask(input) {
-    const data = { status: 'À faire', priority: 'Normale', poles: [], checklist: [], links: [], ...pick(input, TASK_FIELDS) }
+    const data = { status: 'À faire', priority: defaultPriority(cache.settings.priorities), poles: [], checklist: [], links: [], ...pick(input, TASK_FIELDS) }
     const errors = validateTask(data, cache)
     if (Object.keys(errors).length) throw invalid(errors)
     data.deliverable = cache.deliverables.find((d) => d.id === data.deliverableId)?.name ?? ''
@@ -237,4 +244,179 @@ export const sheetsBackend = {
     }))
     return { deliverable: remember('deliverables', deliverable) }
   },
+
+  async listEvents() {
+    return { events: rowsOf(await sheets.readTab('EVENTS')) }
+  },
+
+  async listReports() {
+    return { reports: rowsOf(await sheets.readTab('REPORTS')) }
+  },
+
+  /** Fige un bilan : la ligne n'est plus jamais modifiée, une nouvelle génération crée une nouvelle version. */
+  async createReport({ month, projectId = '', comment = '', content }) {
+    if (!/^\d{4}-\d{2}$/.test(month || '')) throw invalid({ month: 'Mois invalide.' })
+    if (projectId && !cache?.projects.some((p) => p.id === projectId)) throw invalid({ projectId: 'Projet inconnu.' })
+    const rows = rowsOf(await sheets.readTab('REPORTS'))
+    const stamp = now()
+    const report = {
+      id: nextId('R', rows.map((r) => r.id), 4),
+      month,
+      projectId,
+      number: nextNumber(rows, { month, projectId }),
+      comment: String(comment).slice(0, 2000),
+      content,
+      version: 1,
+      archived: false,
+      createdAt: stamp,
+      createdBy: me.email,
+    }
+    // Une cellule Google Sheets contient au plus 50 000 caractères.
+    if (JSON.stringify(report).length > 48_000) throw new ApiError(413, { error: 'Bilan trop volumineux pour être figé : limitez-le à un projet.' })
+    await sheets.appendRow('REPORTS', report.id, report)
+    const scope = projectId ? cache.projects.find((p) => p.id === projectId)?.name : 'tous les projets'
+    await appendEvent({ type: 'report.frozen', entityType: 'report', entity: report.id, projectId, description: `Bilan ${month} figé (version ${report.number}, ${scope})` })
+    await bumpRevision()
+    return { report }
+  },
+
+  // --- Administration (réservée aux administrateurs) ---
+
+  /** Comptes, clients (archivés compris), éléments archivés et versions des paramètres. */
+  async adminData() {
+    requireAdmin()
+    const tabs = await sheets.readTabs(['USERS', 'CLIENTS', 'PROJECTS', 'DELIVERABLES', 'TASKS', 'SETTINGS'])
+    const archived = (tab) => rowsOf(tabs[tab]).filter((x) => x.archived)
+    return {
+      users: rowsOf(tabs.USERS).map(publicUser),
+      clients: rowsOf(tabs.CLIENTS),
+      archived: { projects: archived('PROJECTS'), deliverables: archived('DELIVERABLES'), tasks: archived('TASKS') },
+      settingVersions: Object.fromEntries(rowsOf(tabs.SETTINGS).map((r) => [r.id, r.version])),
+    }
+  },
+
+  async createUser(input) {
+    requireAdmin()
+    const users = rowsOf(await sheets.readTab('USERS'))
+    const data = { role: 'member', active: true, ...pick(input, USER_FIELDS) }
+    data.email = String(data.email ?? '').trim().toLowerCase()
+    const errors = validateUser(data, users)
+    if (Object.keys(errors).length) throw invalid(errors)
+    const stamp = now()
+    const user = { ...data, name: data.name.trim(), id: nextId('U', users.map((u) => u.id)), version: 1, archived: false, createdAt: stamp, updatedAt: stamp, updatedBy: me.email }
+    await sheets.appendRow('USERS', user.id, user)
+    await appendEvent({ type: 'user.created', entityType: 'user', entity: user.id, description: `Compte autorisé : ${user.email} (${user.role})` })
+    await bumpRevision()
+    return { user }
+  },
+
+  async updateUser(id, changes, version) {
+    requireAdmin()
+    const users = rowsOf(await sheets.readTab('USERS'))
+    const current = users.find((u) => u.id === id)
+    if (!current) throw new ApiError(404, { error: 'Compte introuvable.' })
+    const patch = pick(changes, ['name', 'role', 'active'])
+    const refused = selfChangeError(me, current, patch)
+    if (refused) throw new ApiError(422, { error: refused })
+    const errors = validateUser({ ...current, ...patch }, users)
+    if (Object.keys(errors).length) throw invalid(errors)
+    const user = await updateRow('USERS', id, patch, version, (before, after) => {
+      const changed = diff(before, after, ['name', 'role', 'active'])
+      if (!Object.keys(changed).length) return null
+      const what = changed.active ? (after.active ? 'réactivé' : 'désactivé') : 'modifié'
+      return { type: 'user.updated', entityType: 'user', changes: changed, description: `Compte ${what} : ${after.email}` }
+    })
+    if (id === me.id) me = { ...me, name: user.name }
+    return { user: publicUser(user) }
+  },
+
+  async createClient(input) {
+    requireAdmin()
+    const clients = rowsOf(await sheets.readTab('CLIENTS'))
+    const name = String(input.name ?? '').trim()
+    const errors = validateClient({ name }, clients)
+    if (Object.keys(errors).length) throw invalid(errors)
+    const stamp = now()
+    const client = { id: nextId('C', clients.map((c) => c.id)), name, version: 1, archived: false, createdAt: stamp, updatedAt: stamp, updatedBy: me.email }
+    await sheets.appendRow('CLIENTS', client.id, client)
+    await appendEvent({ type: 'client.created', entityType: 'client', entity: client.id, description: `Client créé : ${name}` })
+    await bumpRevision()
+    return { client: remember('clients', client) }
+  },
+
+  async updateClient(id, changes, version) {
+    requireAdmin()
+    const tabs = await sheets.readTabs(['CLIENTS', 'PROJECTS'])
+    const clients = rowsOf(tabs.CLIENTS)
+    const patch = pick(changes, ['name', 'archived'])
+    if ('name' in patch) patch.name = String(patch.name).trim()
+    const current = clients.find((c) => c.id === id) ?? {}
+    const errors = validateClient({ ...current, ...patch }, clients)
+    if (Object.keys(errors).length) throw invalid(errors)
+    if (patch.archived && rowsOf(tabs.PROJECTS).some((p) => p.clientId === id && !p.archived)) {
+      throw new ApiError(422, { error: 'Archivez d\'abord les projets de ce client.' })
+    }
+    const client = await updateRow('CLIENTS', id, patch, version, (before, after) => {
+      const changed = diff(before, after, ['name', 'archived'])
+      if (!Object.keys(changed).length) return null
+      const type = changed.archived ? (after.archived ? 'client.archived' : 'client.restored') : 'client.updated'
+      return { type, entityType: 'client', changes: changed, description: `Client ${changed.archived ? (after.archived ? 'archivé' : 'restauré') : 'modifié'} : ${after.name}` }
+    })
+    return { client: remember('clients', client) }
+  },
+
+  async createProject(input) {
+    requireAdmin()
+    const data = { status: 'En cadrage', achievements: [], watchpoints: [], nextSteps: [], links: [], ...pick(input, PROJECT_FIELDS) }
+    const errors = validateProject(data)
+    if (!cache.clients.some((c) => c.id === data.clientId)) errors.clientId = 'Choisissez un client.'
+    if (Object.keys(errors).length) throw invalid(errors)
+    data.client = cache.clients.find((c) => c.id === data.clientId).name
+    const ids = Object.keys(await sheets.readTab('PROJECTS'))
+    const stamp = now()
+    const project = { ...data, name: data.name.trim(), id: nextId('P', ids), version: 1, archived: false, createdAt: stamp, updatedAt: stamp, updatedBy: me.email }
+    await sheets.appendRow('PROJECTS', project.id, project)
+    await appendEvent({ type: 'project.created', entityType: 'project', entity: project.id, projectId: project.id, description: `Projet créé : ${project.name}` })
+    await bumpRevision()
+    return { project: remember('projects', project) }
+  },
+
+  /** Archive ou restaure un projet, une tâche ou un livrable (kind = project | task | deliverable). */
+  async setArchived(kind, id, archived, version) {
+    requireAdmin()
+    const { tab, label, name } = ARCHIVABLE[kind]
+    const item = await updateRow(tab, id, { archived }, version, (before) => ({
+      type: `${kind}.${archived ? 'archived' : 'restored'}`,
+      entityType: kind,
+      projectId: kind === 'project' ? id : before.projectId ?? '',
+      ...(kind === 'deliverable' ? { deliverableId: id } : {}),
+      description: `${label} ${archived ? 'archivé' : 'restauré'}${kind === 'task' ? 'e' : ''} : ${before[name]}`,
+    }))
+    return { item }
+  },
+
+  /** Remplace la liste des pôles ou des priorités (ligne de l'onglet SETTINGS, versionnée). */
+  async updateSetting(key, value, version) {
+    requireAdmin()
+    const tabs = await sheets.readTabs(['SETTINGS', 'TASKS'])
+    const refused = validateSetting(key, value, normalizeAll({ ...cache, tasks: rowsOf(tabs.TASKS) }, cache.settings).tasks)
+    if (refused) throw new ApiError(422, { error: refused })
+    const event = { type: 'settings.updated', entityType: 'settings', description: `Paramètres modifiés : ${key === 'poles' ? 'pôles' : 'priorités'}` }
+    if (!tabs.SETTINGS[key]) {
+      if (version !== 0) throw new ApiError(409, { error: 'Modifié entre-temps par quelqu\'un d\'autre.', code: 'conflict' })
+      const stamp = now()
+      await sheets.appendRow('SETTINGS', key, { id: key, value, version: 1, archived: false, createdAt: stamp, updatedAt: stamp, updatedBy: me.email })
+      await appendEvent({ ...event, entity: key })
+      await bumpRevision()
+      return { version: 1 }
+    }
+    const row = await updateRow('SETTINGS', key, { value }, version, () => event)
+    return { version: row.version }
+  },
+}
+
+const ARCHIVABLE = {
+  project: { tab: 'PROJECTS', label: 'Projet', name: 'name' },
+  task: { tab: 'TASKS', label: 'Tâche', name: 'title' },
+  deliverable: { tab: 'DELIVERABLES', label: 'Livrable', name: 'name' },
 }

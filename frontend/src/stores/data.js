@@ -20,6 +20,10 @@ export const useDataStore = defineStore('data', {
     loading: false,
     error: null,
     pendingWrites: 0,
+    // Historique et bilans figés : chargés à la demande (écran Bilans), pas au démarrage.
+    events: [],
+    reports: [],
+    historyRevision: null,
   }),
 
   getters: {
@@ -39,8 +43,16 @@ export const useDataStore = defineStore('data', {
         const data = await backend.bootstrap(!force ? this.revision : null)
         if (!data.unchanged) {
           // Les lignes de l'ancien Apps Script sont complétées à la lecture, quel que soit le backend.
-          const { projects, tasks } = normalizeAll(data, data.settings)
-          Object.assign(this, data, { projects, tasks })
+          const normalized = normalizeAll(data, data.settings)
+          // Un projet archivé disparaît des écrans avec ses livrables et ses tâches (restaurables depuis l'administration).
+          const projects = normalized.projects.filter((p) => !p.archived)
+          const active = new Set(projects.map((p) => p.id))
+          Object.assign(this, data, {
+            clients: data.clients.filter((c) => !c.archived),
+            projects,
+            deliverables: data.deliverables.filter((d) => active.has(d.projectId)),
+            tasks: normalized.tasks.filter((t) => active.has(t.projectId)),
+          })
         }
         this.revision = data.revision
         this.error = null
@@ -112,6 +124,37 @@ export const useDataStore = defineStore('data', {
     },
     updateDeliverable(deliverable, changes) {
       return this.save('deliverables', deliverable, changes, async (v) => (await backend.updateDeliverable(deliverable.id, changes, v)).deliverable)
+    },
+    /** Charge l'historique et les bilans figés, sauf s'ils sont à jour de la dernière révision connue. */
+    async loadHistory({ force = false } = {}) {
+      if (!force && this.historyRevision !== null && this.historyRevision === this.revision) return
+      const [{ events }, { reports }] = await Promise.all([backend.listEvents(), backend.listReports()])
+      this.events = events
+      this.reports = reports
+      this.historyRevision = this.revision
+    },
+    async freezeReport(input) {
+      this.pendingWrites++
+      try {
+        const { report } = await backend.createReport(input)
+        this.reports.push(report)
+        await this.load({ force: true })
+        await this.loadHistory({ force: true })
+        return report
+      } finally {
+        this.pendingWrites--
+      }
+    },
+    /** Écriture d'administration : appelle le backend puis recharge tout, la plupart touchant plusieurs écrans. */
+    async adminWrite(call) {
+      this.pendingWrites++
+      try {
+        const result = await call(backend)
+        await this.load({ force: true })
+        return result
+      } finally {
+        this.pendingWrites--
+      }
     },
     setMilestone(deliverable, action, field, body) {
       const changes = { [field]: body.undo ? '' : body.date }

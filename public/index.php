@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use Vlt\Controllers\AdminController;
 use Vlt\Controllers\AuthController;
 use Vlt\Controllers\BootstrapController;
 use Vlt\Controllers\DeliverablesController;
 use Vlt\Controllers\ProjectsController;
+use Vlt\Controllers\ReportsController;
 use Vlt\Controllers\TasksController;
 use Vlt\Http\HttpException;
 use Vlt\Http\Request;
@@ -37,6 +39,8 @@ try {
     $tasks = new TasksController($repo);
     $deliverables = new DeliverablesController($repo);
     $projects = new ProjectsController($repo);
+    $reports = new ReportsController($repo);
+    $admin = new AdminController($repo);
 
     $member = [Middleware::auth(), Middleware::csrf()];
     $router = new Router();
@@ -55,6 +59,20 @@ try {
     $router->add('POST', '/deliverables', $deliverables->create(...), $member);
     $router->add('PATCH', '/deliverables/{id}', $deliverables->update(...), $member);
     $router->add('POST', '/deliverables/{id}/{action}', $deliverables->milestone(...), $member);
+
+    $router->add('GET', '/events', $reports->events(...), $member);
+    $router->add('GET', '/reports', $reports->index(...), $member);
+    $router->add('POST', '/reports', $reports->create(...), $member);
+
+    $admins = [...$member, Middleware::admin()];
+    $router->add('GET', '/admin', $admin->index(...), $admins);
+    $router->add('POST', '/admin/users', $admin->createUser(...), $admins);
+    $router->add('PATCH', '/admin/users/{id}', $admin->updateUser(...), $admins);
+    $router->add('POST', '/admin/clients', $admin->createClient(...), $admins);
+    $router->add('PATCH', '/admin/clients/{id}', $admin->updateClient(...), $admins);
+    $router->add('POST', '/admin/projects', $admin->createProject(...), $admins);
+    $router->add('POST', '/admin/archive/{kind}/{id}', $admin->setArchived(...), $admins);
+    $router->add('POST', '/admin/settings/{key}', $admin->updateSetting(...), $admins);
 
     Response::json($router->dispatch(Request::fromGlobals()));
 } catch (ConflictException $e) {
