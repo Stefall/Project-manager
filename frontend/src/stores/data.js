@@ -148,6 +148,17 @@ export const useDataStore = defineStore('data', {
         this.pendingWrites--
       }
     },
+    /** Bilan client dans Google Docs ; renvoie { url, name }. Appeler directement depuis le clic. */
+    async publishReport(reportId) {
+      this.pendingWrites++
+      try {
+        const result = await backend.publishReport(reportId)
+        await this.loadHistory({ force: true })
+        return result
+      } finally {
+        this.pendingWrites--
+      }
+    },
     /** Écriture d'administration : appelle le backend puis recharge tout, la plupart touchant plusieurs écrans. */
     async adminWrite(call) {
       this.pendingWrites++

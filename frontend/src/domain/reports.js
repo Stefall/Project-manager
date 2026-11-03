@@ -45,6 +45,7 @@ export const EVENT_LABELS = {
   'task.restored': 'Tâche restaurée',
   'deliverable.restored': 'Livrable restauré',
   'report.frozen': 'Bilan figé',
+  'report.published': 'Bilan publié pour le client',
   'user.created': 'Compte autorisé',
   'user.updated': 'Compte modifié',
   'client.created': 'Client créé',
@@ -218,7 +219,7 @@ export function buildReport({ month, projectId = '', projects, deliverables, tas
       .map((t) => ({ ...light(t), deadline: t.deadline })),
     // Faits marquants du mois (les simples modifications restent dans l'historique), bornés pour tenir dans une cellule du Sheet.
     timeline: monthEvents
-      .filter((e) => e.type !== 'task.updated' && e.type !== 'modification' && e.type !== 'report.frozen')
+      .filter((e) => e.type !== 'task.updated' && e.type !== 'modification' && e.type !== 'report.frozen' && e.type !== 'report.published')
       .slice(0, 150)
       .map((e) => ({ date: e.date, type: e.type, description: (e.description || EVENT_LABELS[e.type] || e.type).split('\n')[0].slice(0, 160), author: e.author || '', projectId: e.projectId || '' })),
   }

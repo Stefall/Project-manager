@@ -17,8 +17,8 @@ Limites par rapport à la version serveur : pas de verrou serveur (deux enregist
 ### 1. Identifiant OAuth Google
 
 1. Ouvrir <https://console.cloud.google.com/>, créer un projet « VLT Project Manager ».
-2. **APIs et services → Bibliothèque** : activer **Google Sheets API**.
-3. **APIs et services → Écran de consentement OAuth** : type **Externe**, nom « VLT Project Manager », e-mail d'assistance. Champ d'application : `.../auth/spreadsheets`. Laisser en mode **Test** et ajouter comme **utilisateurs test** chaque compte Google de l'équipe (100 maximum).
+2. **APIs et services → Bibliothèque** : activer **Google Sheets API** et **Google Drive API** (la seconde sert uniquement à publier les bilans clients).
+3. **APIs et services → Écran de consentement OAuth** : type **Externe**, nom « VLT Project Manager », e-mail d'assistance. Champs d'application : `.../auth/spreadsheets` et `.../auth/drive.file` (accès limité aux documents créés par l'app, demandé au premier « Publier dans Google Docs »). Laisser en mode **Test** et ajouter comme **utilisateurs test** chaque compte Google de l'équipe (100 maximum).
 4. **APIs et services → Identifiants → Créer → ID client OAuth** : type **Application Web**.
    - Origines JavaScript autorisées : `https://stefall.github.io`
    - (pour tester en local : `http://localhost:5173`)
@@ -57,3 +57,9 @@ cd frontend
 cp .env.example .env.local   # renseigner VITE_GOOGLE_CLIENT_ID et VITE_SPREADSHEET_ID
 npm install && npm run dev   # http://localhost:5173/app/
 ```
+
+## Bilan client (Google Docs)
+
+Sur **Bilans mensuels**, une version figée d'un projet peut être publiée avec **Publier dans Google Docs**. L'app crée un Google Doc dans le Drive de la personne connectée, mis en page pour le client : chiffres du mois, avancement, réalisé par livrable, tâches en cours par livrable avec les pôles, échéances. Les notes internes des tâches et les points de vigilance n'y figurent pas. On le partage ensuite avec les adresses du client comme tout fichier Drive. Le tableur n'est jamais partagé.
+
+L'autorisation Drive (`drive.file`) ne donne accès qu'aux fichiers créés par l'app. Google la demande au premier clic. Chaque publication est inscrite dans l'historique avec le lien du document.

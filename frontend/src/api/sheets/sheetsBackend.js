@@ -6,7 +6,8 @@ import { DELIVERABLE_FIELDS, diff, MILESTONES, PROJECT_FIELDS, validateDeliverab
 import { nextNumber } from '@/domain/reports'
 import { compactTeam, PERSON_FIELDS, validatePerson, validateTeam } from '@/domain/team'
 import { defaultPriority, publicUser, selfChangeError, USER_FIELDS, validateClient, validateSetting, validateUser } from '@/domain/admin'
-import { googleAuth } from './googleAuth'
+import { clientReportName, renderClientReport } from '@/domain/clientReport'
+import { DRIVE_FILE_SCOPE, googleAuth } from './googleAuth'
 import { sheets } from './sheetsClient'
 
 // Backend « sans serveur » de la démo : le navigateur lit et écrit le Google Sheet avec le compte Google
@@ -286,6 +287,44 @@ export const sheetsBackend = {
     await appendEvent({ type: 'report.frozen', entityType: 'report', entity: report.id, projectId, description: `Bilan ${month} figé (version ${report.number}, ${scope})` })
     await bumpRevision()
     return { report }
+  },
+
+  /**
+   * Publie une version figée pour le client : Google Doc créé dans le Drive de la personne connectée
+   * (autorisation « fichiers créés par l'app » seulement), qu'elle partage ensuite comme tout fichier Drive.
+   * Le tableur n'est jamais partagé. Seul un bilan d'un projet peut être publié.
+   */
+  async publishReport(reportId) {
+    // En premier : Google peut ouvrir une fenêtre de consentement, qui doit suivre directement le clic.
+    const accessToken = await googleAuth.accessTokenWith(DRIVE_FILE_SCOPE)
+    const report = rowsOf(await sheets.readTab('REPORTS')).find((r) => r.id === reportId)
+    if (!report) throw new ApiError(404, { error: 'Version du bilan introuvable.' })
+    if (!report.projectId) throw invalid({ projectId: 'Un bilan client ne concerne qu\'un projet : choisissez le projet, figez sa version, puis publiez-la.' })
+    const name = clientReportName(report.content, report)
+    const boundary = `vlt${Date.now()}`
+    const body = [
+      `--${boundary}`, 'Content-Type: application/json; charset=UTF-8', '',
+      JSON.stringify({ name, mimeType: 'application/vnd.google-apps.document', description: `Bilan ${report.month}, version ${report.number}, établi avec VLT Project Manager.` }),
+      `--${boundary}`, 'Content-Type: text/html; charset=UTF-8', '',
+      renderClientReport(report.content, report),
+      `--${boundary}--`, '',
+    ].join('\r\n')
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    })
+    const file = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const message = response.status === 403
+        ? 'Google Drive a refusé la création du document. Vérifiez que l\'API Google Drive est activée dans le projet Google Cloud de l\'app.'
+        : file.error?.message ?? `Erreur Google Drive ${response.status}`
+      throw new ApiError(response.status, { error: message })
+    }
+    const url = file.webViewLink || `https://docs.google.com/document/d/${file.id}/edit`
+    await appendEvent({ type: 'report.published', entityType: 'report', entity: report.id, projectId: report.projectId, link: url, description: `Bilan ${report.month} publié pour le client (version ${report.number}) : ${name}` })
+    await bumpRevision()
+    return { url, name }
   },
 
   // --- Administration (réservée aux administrateurs) ---
