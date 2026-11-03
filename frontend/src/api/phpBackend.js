@@ -29,6 +29,8 @@ export const phpBackend = {
   listEvents: () => api.get('/events'),
   listReports: () => api.get('/reports'),
   createReport: (input) => api.post('/reports', input),
+  // Le bilan client passe par le Drive de la personne connectée : disponible avec la connexion Google.
+  publishReport: () => Promise.reject(new Error('La publication pour le client est disponible avec la connexion Google.')),
 
   adminData: () => api.get('/admin'),
   createUser: (input) => api.post('/admin/users', input),

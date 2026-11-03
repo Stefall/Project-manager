@@ -32,6 +32,8 @@ function restore() {
 }
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
+// Accès Drive limité aux fichiers créés par l'app (bilans clients) : jamais au reste du Drive.
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 
 // Messages des erreurs renvoyées par Google Identity Services (error_callback).
 const POPUP_ERRORS = {
@@ -52,7 +54,7 @@ function client() {
  * Ouvre la fenêtre Google. Si la bibliothèque est déjà chargée, la fenêtre s'ouvre dans le même tour
  * que le clic : sinon certains navigateurs (Safari, Firefox) la bloquent sans prévenir.
  */
-function requestToken(prompt) {
+function requestToken(prompt, extraScope = '') {
   const open = () => new Promise((resolve, reject) => {
     const tc = client()
     tc.callback = (response) => {
@@ -61,6 +63,9 @@ function requestToken(prompt) {
         return reject(new Error(response.error === 'access_denied'
           ? 'Connexion Google refusée. Si Google indique « Accès bloqué », votre compte doit être ajouté comme utilisateur test de l\'application.'
           : `Connexion Google refusée (${response.error_description || response.error}).`))
+      }
+      if (extraScope && !window.google.accounts.oauth2.hasGrantedAllScopes(response, extraScope)) {
+        return reject(new Error('L\'accès à Google Drive n\'a pas été autorisé : cochez la case proposée par Google pour que l\'app puisse créer le document du bilan.'))
       }
       if (!window.google.accounts.oauth2.hasGrantedAllScopes(response, SHEETS_SCOPE)) {
         return reject(new Error('L\'accès à Google Sheets n\'a pas été autorisé. Reconnectez-vous et cochez la case « Afficher, modifier, créer et supprimer vos feuilles de calcul Google Sheets ».'))
@@ -71,7 +76,7 @@ function requestToken(prompt) {
       console.error('[VLT] Fenêtre Google :', error)
       reject(new Error(POPUP_ERRORS[error?.type] ?? `Connexion Google interrompue (${error?.type || error?.message || 'erreur inconnue'}).`))
     }
-    tc.requestAccessToken({ prompt, hint: token?.email })
+    tc.requestAccessToken({ prompt, hint: token?.email, ...(extraScope ? { scope: `${SCOPES} ${extraScope}` } : {}) })
   })
   if (window.google?.accounts?.oauth2) return open()
   return loadScript().then(open)
@@ -111,9 +116,23 @@ export const googleAuth = {
     if (!token) throw Object.assign(new Error('Session expirée, reconnectez-vous.'), { status: 401 })
     if (token.expires_at < Date.now() + 60_000) {
       const response = await requestToken('')
-      token = { ...token, access_token: response.access_token, expires_at: Date.now() + response.expires_in * 1000 }
+      token = { ...token, access_token: response.access_token, expires_at: Date.now() + response.expires_in * 1000, scopes: response.scope || '' }
       persist()
     }
+    return token.access_token
+  },
+
+  /**
+   * Jeton qui inclut une autorisation supplémentaire (ex. Drive), demandée seulement au premier usage.
+   * À appeler directement depuis un clic : Google peut ouvrir une fenêtre de consentement.
+   */
+  async accessTokenWith(scope) {
+    if (!token) restore()
+    if (!token) throw Object.assign(new Error('Session expirée, reconnectez-vous.'), { status: 401 })
+    if (token.scopes?.includes(scope) && token.expires_at > Date.now() + 60_000) return token.access_token
+    const response = await requestToken('', scope)
+    token = { ...token, access_token: response.access_token, expires_at: Date.now() + response.expires_in * 1000, scopes: response.scope || scope }
+    persist()
     return token.access_token
   },
 

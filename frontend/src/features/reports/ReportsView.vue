@@ -66,6 +66,24 @@ async function freeze() {
   }
 }
 
+// Bilan client : Google Doc créé dans le Drive de la personne connectée, à partager avec le client.
+const publishing = ref(false)
+const publications = computed(() => (current.value
+  ? data.events.filter((e) => e.type === 'report.published' && e.entity === current.value.id).sort((a, b) => b.date.localeCompare(a.date))
+  : []))
+async function publish() {
+  publishing.value = true
+  try {
+    const { url } = await data.publishReport(current.value.id)
+    window.open(url, '_blank', 'noopener')
+    ui.toast('Document créé dans votre Google Drive : partagez-le avec le client depuis Google Docs.', 'success')
+  } catch (e) {
+    ui.toast(e.message, 'error')
+  } finally {
+    publishing.value = false
+  }
+}
+
 function print() {
   const previous = document.title
   const scope = projectId.value ? data.projectById[projectId.value]?.name : 'Tous les projets'
@@ -125,6 +143,23 @@ function print() {
           <p class="muted">Une version figée garde exactement ce contenu, même si les tâches changent ensuite.</p>
         </div>
         <VButton @click="print">Exporter en PDF</VButton>
+
+        <div class="client">
+          <h2 class="section-title">Pour le client</h2>
+          <template v-if="!projectId">
+            <p class="muted">Un bilan client concerne un seul projet : choisissez-le dans « Périmètre ».</p>
+          </template>
+          <template v-else-if="!current">
+            <p class="muted">Figez cette version, puis publiez-la : le client recevra exactement ce contenu.</p>
+          </template>
+          <template v-else>
+            <VButton variant="primary" :loading="publishing" @click="publish">Publier dans Google Docs</VButton>
+            <p class="muted">Crée un document dans votre Google Drive, mis en page pour le client (sans notes internes). Vous le partagez ensuite avec ses adresses, comme tout fichier Drive.</p>
+            <ul v-if="publications.length" class="client__list">
+              <li v-for="e in publications" :key="e.id">{{ DATE.format(new Date(e.date)) }} · <a :href="e.link" target="_blank" rel="noopener">ouvrir le document</a></li>
+            </ul>
+          </template>
+        </div>
       </aside>
 
       <ReportDocument v-if="current" :key="current.id" :content="current.content" :meta="current" />
@@ -135,6 +170,8 @@ function print() {
 
 <style scoped lang="scss">
 .muted { color: var(--ink-muted); font-size: var(--text-xs); margin: 0; }
+.client { display: grid; gap: var(--space-2); padding-top: var(--space-4); border-top: 1px solid var(--line);
+  &__list { list-style: none; margin: 0; padding: 0; font-size: var(--text-xs); display: grid; gap: 2px; } }
 .error { color: var(--status-blocked); }
 .toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); overflow: hidden;
   button { border: 0; background: var(--surface); padding: var(--space-2) var(--space-4); cursor: pointer; font-size: var(--text-sm); }
